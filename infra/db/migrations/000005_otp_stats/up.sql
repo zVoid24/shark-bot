@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS otp_stats (
+    country TEXT PRIMARY KEY,
+    count   INTEGER NOT NULL DEFAULT 0
+);

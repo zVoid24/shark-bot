@@ -2,13 +2,16 @@ package db
 
 import (
 	"fmt"
-	"log"
-	"shark_bot/config"
 	"time"
+
+	"shark_bot/config"
+	"shark_bot/pkg/logger"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
+
+var connLog = logger.New("db.connection")
 
 func GetConnectionString(dbCnf *config.DatabaseConfig) string {
 	return fmt.Sprintf(
@@ -18,7 +21,7 @@ func GetConnectionString(dbCnf *config.DatabaseConfig) string {
 		dbCnf.User,
 		dbCnf.Password,
 		dbCnf.Name,
-		dbCnf.SSLMode, // correct usage
+		dbCnf.SSLMode,
 	)
 }
 
@@ -30,17 +33,14 @@ func NewConnection(dbCnf *config.DatabaseConfig) (*sqlx.DB, error) {
 		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
 
-	// 🔥 Connection Pool Settings (IMPORTANT)
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	// 🔥 Verify connection
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping db: %w", err)
 	}
 
-	log.Println("✅ Connected to PostgreSQL")
-
+	connLog.Info("connected to PostgreSQL")
 	return db, nil
 }

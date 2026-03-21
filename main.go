@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "shark_bot/cmd"
 
 func main() {
-	fmt.Println("Hello")
+	cmd.Serve()
 }

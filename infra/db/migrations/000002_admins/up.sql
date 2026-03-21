@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS admins (
+    user_id TEXT PRIMARY KEY
+);

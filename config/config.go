@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -18,8 +19,10 @@ type DatabaseConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken      string
-	TargetGroupID int64
+	BotToken       string
+	TargetGroupIDs []int64
+	OwnerIDs       []string
+	CooldownSecs   int
 }
 
 type AppConfig struct {
@@ -61,22 +64,40 @@ func getInt(key string) int {
 	return i
 }
 
-func getInt64(key string) int64 {
-	val := mustGet(key)
-	i, err := strconv.ParseInt(val, 10, 64)
-	if err != nil {
-		fmt.Printf("❌ Invalid int64 for %s\n", key)
-		os.Exit(1)
-	}
-	return i
-}
-
 func getDefault(key, def string) string {
 	val := os.Getenv(key)
 	if val == "" {
 		return def
 	}
 	return val
+}
+
+// parseInt64List parses a comma-separated list of int64 values
+func parseInt64List(raw string) []int64 {
+	var result []int64
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err == nil {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+// parseStringList parses a comma-separated list of strings
+func parseStringList(raw string) []string {
+	var result []string
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 func Load() *Config {
@@ -93,7 +114,7 @@ func Load() *Config {
 	}
 
 	// --- Database ---
-	db := DatabaseConfig{
+	dbCfg := DatabaseConfig{
 		Host:     mustGet("DB_HOST"),
 		Port:     getInt("DB_PORT"),
 		User:     mustGet("DB_USER"),
@@ -103,14 +124,20 @@ func Load() *Config {
 	}
 
 	// --- Telegram ---
+	groupIDsRaw := getDefault("TARGET_GROUP_IDS", getDefault("TARGET_GROUP_ID", ""))
+	ownerIDsRaw := mustGet("OWNER_IDS")
+	cooldown, _ := strconv.Atoi(getDefault("COOLDOWN_SECONDS", "10"))
+
 	tg := TelegramConfig{
-		BotToken:      mustGet("BOT_TOKEN"),
-		TargetGroupID: getInt64("TARGET_GROUP_ID"),
+		BotToken:       mustGet("BOT_TOKEN"),
+		TargetGroupIDs: parseInt64List(groupIDsRaw),
+		OwnerIDs:       parseStringList(ownerIDsRaw),
+		CooldownSecs:   cooldown,
 	}
 
 	cfg = &Config{
 		App:      app,
-		Database: db,
+		Database: dbCfg,
 		Telegram: tg,
 	}
 
