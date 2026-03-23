@@ -6,6 +6,7 @@ import (
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
+	"shark_bot/internal/processednumber"
 	"shark_bot/internal/seennumber"
 	"shark_bot/internal/settings"
 	"shark_bot/internal/stats"
@@ -46,6 +47,7 @@ func Serve() {
 	settingsRepo := repository.NewSettingsRepo(dbConn)
 	statsRepo := repository.NewStatsRepo(dbConn)
 	seenRepo := repository.NewSeenNumberRepo(dbConn)
+	processedRepo := repository.NewProcessedNumberRepo(dbConn)
 
 	// 5. Wrap repos in domain services (application layer)
 	userSvc := user.NewService(userRepo)
@@ -55,6 +57,13 @@ func Serve() {
 	settingsSvc := settings.NewService(settingsRepo)
 	statsSvc := stats.NewService(statsRepo)
 	seenSvc := seennumber.NewService(seenRepo)
+	processedSvc := processednumber.NewService(processedRepo)
+
+	// 5.5 Initialize Scraper
+	scrp, err := bot.NewScraper(cnf.Scraper.LoginURL, cnf.Scraper.SMSURL, cnf.Scraper.Username, cnf.Scraper.Password)
+	if err != nil {
+		log.Error("failed to init scraper", "err", err)
+	}
 
 	// 6. Seed initial owner IDs as admins
 	if err := adminSvc.SeedOwners(cnf.Telegram.OwnerIDs); err != nil {
@@ -78,6 +87,8 @@ func Serve() {
 		settingsSvc,
 		statsSvc,
 		seenSvc,
+		processedSvc,
+		scrp,
 		cnf.Telegram.TargetGroupIDs,
 		cnf.Telegram.OwnerIDs,
 		cnf.Telegram.CooldownSecs,

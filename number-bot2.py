@@ -16,9 +16,34 @@ from phonenumbers import geocoder
 import json
 import sqlite3
 
+def load_env():
+    """Simple parser for .env file to load variables into os.environ"""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        print("[⚠️] .env file not found. Using default values.")
+        return
+
+    with open(env_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                os.environ[key.strip()] = value.strip()
+
+# Load environment variables
+load_env()
+
 # ================= CONFIGURATION =================
-BOT_TOKEN = "8156968237:AAFe_oMzD8E64-oBbGUKX4v5yx7dIETES0o"
-CHAT_ID = "-1003422191454"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8670441836:AAF3h0mbS3-bGwz41SQsZOrkUO2S3WN-hzU")
+OWNER_IDS = os.getenv("OWNER_IDS", "").split(",")
+OWNER_ID = OWNER_IDS[0] if OWNER_IDS and OWNER_IDS[0] else None
+
+# Get target group IDs from env, use provided default if not found
+TARGET_GROUP_IDS = os.getenv("TARGET_GROUP_IDS", "-1003422191454").split(",")
+CHAT_ID = TARGET_GROUP_IDS[0] if TARGET_GROUP_IDS and TARGET_GROUP_IDS[0] else "-1003422191454"
+
 LOGIN_URL = "http://185.2.83.39/ints/login"
 SMS_URL = "http://185.2.83.39/ints/agent/SMSCDRReports"
 DB_FILE = "otp_numbers.db"
@@ -28,238 +53,238 @@ def get_service_animation(service):
     s = service.lower() if service else ""
     
     if any(x in s for x in ["whatsapp", "ws", "wa", "واتساب", "واتس"]):
-        return "<tg-emoji emoji-id='5334998226636390258'>📞</tg-emoji>"
+        return "📞"
     
     if any(x in s for x in ["facebook", "fb", "فيسبوك"]):
-        return "<tg-emoji emoji-id='5323261730283863478'>💬</tg-emoji>"
+        return "💬"
     
     if any(x in s for x in ["telegram", "tg", "تيليجرام", "تلي"]):
-        return "<tg-emoji emoji-id='5330237710655306682'>👉</tg-emoji>"
+        return "👉"
     
     if any(x in s for x in ["instagram", "ig", "انستقرام", "انستا"]):
-        return "<tg-emoji emoji-id='5319160079465857105'>📷</tg-emoji>"
+        return "📷"
     
     if any(x in s for x in ["twitter", "x", "تويتر"]):
-        return "<tg-emoji emoji-id='5224499567197700690'>🐦</tg-emoji>"
+        return "🐦"
     
     if any(x in s for x in ["tiktok", "تيك توك", "تيك"]):
-        return "<tg-emoji emoji-id='5224601903383457698'>🎵</tg-emoji>"
+        return "🎵"
     
     if any(x in s for x in ["snapchat", "snap", "سناب"]):
-        return "<tg-emoji emoji-id='5222345550904439270'>👻</tg-emoji>"
+        return "👻"
     
     if any(x in s for x in ["google", "gmail", "جوجل", "جميل"]):
-        return "<tg-emoji emoji-id='5222029789203804982'>🔍</tg-emoji>"
+        return "🔍"
     
     return ""
 
 # ================= POWER ICONS =================
-POWER_ICON = "<tg-emoji emoji-id='6010280017437661523'>⛩️</tg-emoji>"
-POWER_EYE = "<tg-emoji emoji-id='5888704237910627502'>👁</tg-emoji>"
+POWER_ICON = "⛩️"
+POWER_EYE = "👁"
 
 # ================= COMPLETE ANIMATED COUNTRY FLAGS (Lebanon Normal) =================
 COUNTRY_MAP = {
     # Africa
-    "20": ("EG", "<tg-emoji emoji-id='5222161185138292290'>🇪🇬</tg-emoji>"),  # Egypt
-    "27": ("ZA", "<tg-emoji emoji-id='5224696216570309138'>🇿🇦</tg-emoji>"),  # South Africa
-    "211": ("SS", "<tg-emoji emoji-id='5224618146949773268'>🇸🇸</tg-emoji>"),  # South Sudan
-    "212": ("MA", "<tg-emoji emoji-id='5224530035695693965'>🇲🇦</tg-emoji>"),  # Morocco
-    "213": ("DZ", "<tg-emoji emoji-id='5224260376174015500'>🇩🇿</tg-emoji>"),  # Algeria
-    "216": ("TN", "<tg-emoji emoji-id='5221991375016310330'>🇹🇳</tg-emoji>"),  # Tunisia
-    "218": ("LY", "<tg-emoji emoji-id='5222194286451242896'>🇱🇾</tg-emoji>"),  # Libya
-    "220": ("GM", "<tg-emoji emoji-id='5221949872747330159'>🇬🇲</tg-emoji>"),  # Gambia
-    "221": ("SN", "<tg-emoji emoji-id='5224358988623130949'>🇸🇳</tg-emoji>"),  # Senegal
-    "222": ("MR", "<tg-emoji emoji-id='5224269666188274723'>🇲🇷</tg-emoji>"),  # Mauritania
-    "223": ("ML", "<tg-emoji emoji-id='5224322352552096671'>🇲🇱</tg-emoji>"),  # Mali
-    "224": ("GN", "<tg-emoji emoji-id='5222337588035073000'>🇬🇳</tg-emoji>"),  # Guinea
+    "20": ("EG", "🇪🇬"),  # Egypt
+    "27": ("ZA", "🇿🇦"),  # South Africa
+    "211": ("SS", "🇸🇸"),  # South Sudan
+    "212": ("MA", "🇲🇦"),  # Morocco
+    "213": ("DZ", "🇩🇿"),  # Algeria
+    "216": ("TN", "🇹🇳"),  # Tunisia
+    "218": ("LY", "🇱🇾"),  # Libya
+    "220": ("GM", "🇬🇲"),  # Gambia
+    "221": ("SN", "🇸🇳"),  # Senegal
+    "222": ("MR", "🇲🇷"),  # Mauritania
+    "223": ("ML", "🇲🇱"),  # Mali
+    "224": ("GN", "🇬🇳"),  # Guinea
     "225": ("CI", "🇨🇮"),  # Ivory Coast - নরমাল ফ্ল্যাগ
     "226": ("BF", "🇧🇫"),  # Burkina Faso
-    "227": ("NE", "<tg-emoji emoji-id='5222099049846420864'>🇳🇪</tg-emoji>"),  # Niger
-    "228": ("TG", "<tg-emoji emoji-id='5222408051268532030'>🇹🇬</tg-emoji>"),  # Togo
-    "229": ("BJ", "<tg-emoji emoji-id='5224515905253291409'>🇧🇯</tg-emoji>"),  # Benin
-    "230": ("MU", "<tg-emoji emoji-id='5224393700548814960'>🇲🇺</tg-emoji>"),  # Mauritius
-    "231": ("LR", "<tg-emoji emoji-id='5224420995065983217'>🇱🇷</tg-emoji>"),  # Liberia
-    "232": ("SL", "<tg-emoji emoji-id='5224420995065983217'>🇸🇱</tg-emoji>"),  # Sierra Leone
-    "233": ("GH", "<tg-emoji emoji-id='5224511339703056124'>🇬🇭</tg-emoji>"),  # Ghana
-    "234": ("NG", "<tg-emoji emoji-id='5224723614166691638'>🇳🇬</tg-emoji>"),  # Nigeria
-    "235": ("TD", "<tg-emoji emoji-id='5222060468155204001'>🇹🇩</tg-emoji>"),  # Chad
-    "236": ("CF", "<tg-emoji emoji-id='5222060468155204001'>🇨🇫</tg-emoji>"),  # Central African Republic
-    "237": ("CM", "<tg-emoji emoji-id='5222234560359577687'>🇨🇲</tg-emoji>"),  # Cameroon
-    "238": ("CV", "<tg-emoji emoji-id='5224567367551428669'>🇨🇻</tg-emoji>"),  # Cape Verde
-    "239": ("ST", "<tg-emoji emoji-id='5221953304426198315'>🇸🇹</tg-emoji>"),  # Sao Tome
-    "240": ("GQ", "<tg-emoji emoji-id='5224455152940886669'>🇬🇶</tg-emoji>"),  # Equatorial Guinea
-    "241": ("GA", "<tg-emoji emoji-id='5222152195771742239'>🇬🇦</tg-emoji>"),  # Gabon
-    "242": ("CG", "<tg-emoji emoji-id='5224490444687158452'>🇨🇬</tg-emoji>"),  # Congo
-    "243": ("CD", "<tg-emoji emoji-id='5224490444687158452'>🇨🇩</tg-emoji>"),  # DR Congo
-    "244": ("AO", "<tg-emoji emoji-id='5224379767674907895'>🇦🇴</tg-emoji>"),  # Angola
-    "245": ("GW", "<tg-emoji emoji-id='5224705704153066489'>🇬🇼</tg-emoji>"),  # Guinea-Bissau
-    "248": ("SC", "<tg-emoji emoji-id='5224467496676896871'>🇸🇨</tg-emoji>"),  # Seychelles
-    "249": ("SD", "<tg-emoji emoji-id='5224372990216514135'>🇸🇩</tg-emoji>"),  # Sudan
-    "250": ("RW", "<tg-emoji emoji-id='5222449197055227754'>🇷🇼</tg-emoji>"),  # Rwanda
-    "251": ("ET", "<tg-emoji emoji-id='5224467805914542024'>🇪🇹</tg-emoji>"),  # Ethiopia
-    "252": ("SO", "<tg-emoji emoji-id='5222370504664428325'>🇸🇴</tg-emoji>"),  # Somalia
-    "253": ("DJ", "<tg-emoji emoji-id='5221991375016310330'>🇩🇯</tg-emoji>"),  # Djibouti
-    "254": ("KE", "<tg-emoji emoji-id='5222089648163009103'>🇰🇪</tg-emoji>"),  # Kenya
-    "255": ("TZ", "<tg-emoji emoji-id='5224397364155923150'>🇹🇿</tg-emoji>"),  # Tanzania
-    "256": ("UG", "<tg-emoji emoji-id='5222464040462200940'>🇺🇬</tg-emoji>"),  # Uganda
-    "257": ("BI", "<tg-emoji emoji-id='5224490444687158452'>🇧🇮</tg-emoji>"),  # Burundi
-    "258": ("MZ", "<tg-emoji emoji-id='5222470388423864826'>🇲🇿</tg-emoji>"),  # Mozambique
-    "260": ("ZM", "<tg-emoji emoji-id='5224646626877911277'>🇿🇲</tg-emoji>"),  # Zambia
-    "261": ("MG", "<tg-emoji emoji-id='5222042605386217334'>🇲🇬</tg-emoji>"),  # Madagascar
-    "262": ("RE", "<tg-emoji emoji-id='5222042605386217334'>🇷🇪</tg-emoji>"),  # Reunion
-    "263": ("ZW", "<tg-emoji emoji-id='5222060442385397848'>🇿🇼</tg-emoji>"),  # Zimbabwe
-    "264": ("NA", "<tg-emoji emoji-id='5224690826386351746'>🇳🇦</tg-emoji>"),  # Namibia
-    "265": ("MW", "<tg-emoji emoji-id='5222470435668505656'>🇲🇼</tg-emoji>"),  # Malawi
-    "266": ("LS", "<tg-emoji emoji-id='5224660718665607511'>🇱🇸</tg-emoji>"),  # Lesotho
-    "267": ("BW", "<tg-emoji emoji-id='5224570532942329532'>🇧🇼</tg-emoji>"),  # Botswana
-    "268": ("SZ", "<tg-emoji emoji-id='5224269666188274723'>🇸🇿</tg-emoji>"),  # Eswatini
-    "269": ("KM", "<tg-emoji emoji-id='5222398735484466247'>🇰🇲</tg-emoji>"),  # Comoros
+    "227": ("NE", "🇳🇪"),  # Niger
+    "228": ("TG", "🇹🇬"),  # Togo
+    "229": ("BJ", "🇧🇯"),  # Benin
+    "230": ("MU", "🇲🇺"),  # Mauritius
+    "231": ("LR", "🇱🇷"),  # Liberia
+    "232": ("SL", "🇸🇱"),  # Sierra Leone
+    "233": ("GH", "🇬🇭"),  # Ghana
+    "234": ("NG", "🇳🇬"),  # Nigeria
+    "235": ("TD", "🇹🇩"),  # Chad
+    "236": ("CF", "🇨🇫"),  # Central African Republic
+    "237": ("CM", "🇨🇲"),  # Cameroon
+    "238": ("CV", "🇨🇻"),  # Cape Verde
+    "239": ("ST", "🇸🇹"),  # Sao Tome
+    "240": ("GQ", "🇬🇶"),  # Equatorial Guinea
+    "241": ("GA", "🇬🇦"),  # Gabon
+    "242": ("CG", "🇨🇬"),  # Congo
+    "243": ("CD", "🇨🇩"),  # DR Congo
+    "244": ("AO", "🇦🇴"),  # Angola
+    "245": ("GW", "🇬🇼"),  # Guinea-Bissau
+    "248": ("SC", "🇸🇨"),  # Seychelles
+    "249": ("SD", "🇸🇩"),  # Sudan
+    "250": ("RW", "🇷🇼"),  # Rwanda
+    "251": ("ET", "🇪🇹"),  # Ethiopia
+    "252": ("SO", "🇸🇴"),  # Somalia
+    "253": ("DJ", "🇩🇯"),  # Djibouti
+    "254": ("KE", "🇰🇪"),  # Kenya
+    "255": ("TZ", "🇹🇿"),  # Tanzania
+    "256": ("UG", "🇺🇬"),  # Uganda
+    "257": ("BI", "🇧🇮"),  # Burundi
+    "258": ("MZ", "🇲🇿"),  # Mozambique
+    "260": ("ZM", "🇿🇲"),  # Zambia
+    "261": ("MG", "🇲🇬"),  # Madagascar
+    "262": ("RE", "🇷🇪"),  # Reunion
+    "263": ("ZW", "🇿🇼"),  # Zimbabwe
+    "264": ("NA", "🇳🇦"),  # Namibia
+    "265": ("MW", "🇲🇼"),  # Malawi
+    "266": ("LS", "🇱🇸"),  # Lesotho
+    "267": ("BW", "🇧🇼"),  # Botswana
+    "268": ("SZ", "🇸🇿"),  # Eswatini
+    "269": ("KM", "🇰🇲"),  # Comoros
 
     # Asia
-    "60": ("MY", "<tg-emoji emoji-id='5224312886444174057'>🇲🇾</tg-emoji>"),  # Malaysia
-    "62": ("ID", "<tg-emoji emoji-id='5224405893960969756'>🇮🇩</tg-emoji>"),  # Indonesia
-    "63": ("PH", "<tg-emoji emoji-id='5222065042295376892'>🇵🇭</tg-emoji>"),  # Philippines
-    "64": ("NZ", "<tg-emoji emoji-id='5224573595254009705'>🇳🇿</tg-emoji>"),  # New Zealand
-    "65": ("SG", "<tg-emoji emoji-id='5224194023224257181'>🇸🇬</tg-emoji>"),  # Singapore
-    "66": ("TH", "<tg-emoji emoji-id='5224638530864556281'>🇹🇭</tg-emoji>"),  # Thailand
-    "81": ("JP", "<tg-emoji emoji-id='5222390089715299207'>🇯🇵</tg-emoji>"),  # Japan
-    "82": ("KR", "<tg-emoji emoji-id='5222345550904439270'>🇰🇷</tg-emoji>"),  # South Korea
-    "84": ("VN", "<tg-emoji emoji-id='5222359651282071925'>🇻🇳</tg-emoji>"),  # Vietnam
-    "86": ("CN", "<tg-emoji emoji-id='5224435456220868088'>🇨🇳</tg-emoji>"),  # China
-    "90": ("TR", "<tg-emoji emoji-id='5224601903383457698'>🇹🇷</tg-emoji>"),  # Turkey
-    "91": ("IN", "<tg-emoji emoji-id='5222300011366200403'>🇮🇳</tg-emoji>"),  # India
-    "92": ("PK", "<tg-emoji emoji-id='5224637061985742245'>🇵🇰</tg-emoji>"),  # Pakistan
-    "93": ("AF", "<tg-emoji emoji-id='5222096009009575868'>🇦🇫</tg-emoji>"),  # Afghanistan
-    "94": ("LK", "<tg-emoji emoji-id='5224277294050192388'>🇱🇰</tg-emoji>"),  # Sri Lanka
-    "95": ("MM", "<tg-emoji emoji-id='5224393700548814960'>🇲🇲</tg-emoji>"),  # Myanmar
-    "98": ("IR", "<tg-emoji emoji-id='5224374154152653367'>🇮🇷</tg-emoji>"),  # Iran
-    "850": ("KP", "<tg-emoji emoji-id='5222345550904439270'>🇰🇵</tg-emoji>"),  # North Korea
-    "852": ("HK", "<tg-emoji emoji-id='5224435456220868088'>🇭🇰</tg-emoji>"),  # Hong Kong
-    "853": ("MO", "<tg-emoji emoji-id='5224435456220868088'>🇲🇴</tg-emoji>"),  # Macau
-    "855": ("KH", "<tg-emoji emoji-id='5224638530864556281'>🇰🇭</tg-emoji>"),  # Cambodia
-    "856": ("LA", "<tg-emoji emoji-id='5224638530864556281'>🇱🇦</tg-emoji>"),  # Laos
-    "960": ("MV", "<tg-emoji emoji-id='5224393700548814960'>🇲🇻</tg-emoji>"),  # Maldives
+    "60": ("MY", "🇲🇾"),  # Malaysia
+    "62": ("ID", "🇮🇩"),  # Indonesia
+    "63": ("PH", "🇵🇭"),  # Philippines
+    "64": ("NZ", "🇳🇿"),  # New Zealand
+    "65": ("SG", "🇸🇬"),  # Singapore
+    "66": ("TH", "🇹🇭"),  # Thailand
+    "81": ("JP", "🇯🇵"),  # Japan
+    "82": ("KR", "🇰🇷"),  # South Korea
+    "84": ("VN", "🇻🇳"),  # Vietnam
+    "86": ("CN", "🇨🇳"),  # China
+    "90": ("TR", "🇹🇷"),  # Turkey
+    "91": ("IN", "🇮🇳"),  # India
+    "92": ("PK", "🇵🇰"),  # Pakistan
+    "93": ("AF", "🇦🇫"),  # Afghanistan
+    "94": ("LK", "🇱🇰"),  # Sri Lanka
+    "95": ("MM", "🇲🇲"),  # Myanmar
+    "98": ("IR", "🇮🇷"),  # Iran
+    "850": ("KP", "🇰🇵"),  # North Korea
+    "852": ("HK", "🇭🇰"),  # Hong Kong
+    "853": ("MO", "🇲🇴"),  # Macau
+    "855": ("KH", "🇰🇭"),  # Cambodia
+    "856": ("LA", "🇱🇦"),  # Laos
+    "960": ("MV", "🇲🇻"),  # Maldives
     "961": ("LB", "🇱🇧"),  # Lebanon - NORMAL FLAG (as requested)
-    "962": ("JO", "<tg-emoji emoji-id='5222229234600130045'>🇯🇴</tg-emoji>"),  # Jordan
-    "963": ("SY", "<tg-emoji emoji-id='5224601903383457698'>🇸🇾</tg-emoji>"),  # Syria
-    "964": ("IQ", "<tg-emoji emoji-id='5221980268230882832'>🇮🇶</tg-emoji>"),  # Iraq
-    "965": ("KW", "<tg-emoji emoji-id='5222225596762830469'>🇰🇼</tg-emoji>"),  # Kuwait
-    "966": ("SA", "<tg-emoji emoji-id='5224698145010624573'>🇸🇦</tg-emoji>"),  # Saudi Arabia
-    "967": ("YE", "<tg-emoji emoji-id='5222300655611294950'>🇾🇪</tg-emoji>"),  # Yemen
-    "968": ("OM", "<tg-emoji emoji-id='5222396686785066306'>🇴🇲</tg-emoji>"),  # Oman
-    "970": ("PS", "<tg-emoji emoji-id='5222041677673282461'>🇵🇸</tg-emoji>"),  # Palestine
-    "971": ("AE", "<tg-emoji emoji-id='5224565851427976312'>🇦🇪</tg-emoji>"),  # UAE
-    "972": ("IL", "<tg-emoji emoji-id='5224720599099648709'>🇮🇱</tg-emoji>"),  # Israel
-    "973": ("BH", "<tg-emoji emoji-id='5222225596762830469'>🇧🇭</tg-emoji>"),  # Bahrain
-    "974": ("QA", "<tg-emoji emoji-id='5222225596762830469'>🇶🇦</tg-emoji>"),  # Qatar
-    "975": ("BT", "<tg-emoji emoji-id='5222444378101925267'>🇧🇹</tg-emoji>"),  # Bhutan
-    "976": ("MN", "<tg-emoji emoji-id='5224192257992701543'>🇲🇳</tg-emoji>"),  # Mongolia
-    "977": ("NP", "<tg-emoji emoji-id='5222444378101925267'>🇳🇵</tg-emoji>"),  # Nepal
-    "992": ("TJ", "<tg-emoji emoji-id='5222217865821696536'>🇹🇯</tg-emoji>"),  # Tajikistan
-    "993": ("TM", "<tg-emoji emoji-id='5224256935905208951'>🇹🇲</tg-emoji>"),  # Turkmenistan
-    "994": ("AZ", "<tg-emoji emoji-id='5224426544163728284'>🇦🇿</tg-emoji>"),  # Azerbaijan
-    "995": ("GE", "<tg-emoji emoji-id='5222152195771742239'>🇬🇪</tg-emoji>"),  # Georgia
-    "996": ("KG", "<tg-emoji emoji-id='5224426544163728284'>🇰🇬</tg-emoji>"),  # Kyrgyzstan
-    "998": ("UZ", "<tg-emoji emoji-id='5222404546575219535'>🇺🇿</tg-emoji>"),  # Uzbekistan
+    "962": ("JO", "🇯🇴"),  # Jordan
+    "963": ("SY", "🇸🇾"),  # Syria
+    "964": ("IQ", "🇮🇶"),  # Iraq
+    "965": ("KW", "🇰🇼"),  # Kuwait
+    "966": ("SA", "🇸🇦"),  # Saudi Arabia
+    "967": ("YE", "🇾🇪"),  # Yemen
+    "968": ("OM", "🇴🇲"),  # Oman
+    "970": ("PS", "🇵🇸"),  # Palestine
+    "971": ("AE", "🇦🇪"),  # UAE
+    "972": ("IL", "🇮🇱"),  # Israel
+    "973": ("BH", "🇧🇭"),  # Bahrain
+    "974": ("QA", "🇶🇦"),  # Qatar
+    "975": ("BT", "🇧🇹"),  # Bhutan
+    "976": ("MN", "🇲🇳"),  # Mongolia
+    "977": ("NP", "🇳🇵"),  # Nepal
+    "992": ("TJ", "🇹🇯"),  # Tajikistan
+    "993": ("TM", "🇹🇲"),  # Turkmenistan
+    "994": ("AZ", "🇦🇿"),  # Azerbaijan
+    "995": ("GE", "🇬🇪"),  # Georgia
+    "996": ("KG", "🇰🇬"),  # Kyrgyzstan
+    "998": ("UZ", "🇺🇿"),  # Uzbekistan
 
     # Europe
-    "30": ("GR", "<tg-emoji emoji-id='5222463490706389920'>🇬🇷</tg-emoji>"),  # Greece
-    "31": ("NL", "<tg-emoji emoji-id='5224516489368841614'>🇳🇱</tg-emoji>"),  # Netherlands
-    "32": ("BE", "<tg-emoji emoji-id='5224520754271366661'>🇧🇪</tg-emoji>"),  # Belgium
-    "33": ("FR", "<tg-emoji emoji-id='5222029789203804982'>🇫🇷</tg-emoji>"),  # France
-    "34": ("ES", "<tg-emoji emoji-id='5222024776976970940'>🇪🇸</tg-emoji>"),  # Spain
-    "36": ("HU", "<tg-emoji emoji-id='5224691998912427164'>🇭🇺</tg-emoji>"),  # Hungary
-    "39": ("IT", "<tg-emoji emoji-id='5222460101977190141'>🇮🇹</tg-emoji>"),  # Italy
-    "40": ("RO", "<tg-emoji emoji-id='5222273794885826118'>🇷🇴</tg-emoji>"),  # Romania
-    "41": ("CH", "<tg-emoji emoji-id='5224707263226194753'>🇨🇭</tg-emoji>"),  # Switzerland
-    "43": ("AT", "<tg-emoji emoji-id='5224520754271366661'>🇦🇹</tg-emoji>"),  # Austria
-    "44": ("GB", "<tg-emoji emoji-id='5224518800061245598'>🇬🇧</tg-emoji>"),  # United Kingdom
-    "45": ("DK", "<tg-emoji emoji-id='5224245902134226386'>🇩🇰</tg-emoji>"),  # Denmark
-    "46": ("SE", "<tg-emoji emoji-id='5222201098269373561'>🇸🇪</tg-emoji>"),  # Sweden
-    "47": ("NO", "<tg-emoji emoji-id='5224465228934163949'>🇳🇴</tg-emoji>"),  # Norway
-    "48": ("PL", "<tg-emoji emoji-id='5224670399521892983'>🇵🇱</tg-emoji>"),  # Poland
-    "49": ("DE", "<tg-emoji emoji-id='5222165617544542414'>🇩🇪</tg-emoji>"),  # Germany
-    "350": ("GI", "<tg-emoji emoji-id='5224518800061245598'>🇬🇮</tg-emoji>"),  # Gibraltar
-    "351": ("PT", "<tg-emoji emoji-id='5224404094369672274'>🇵🇹</tg-emoji>"),  # Portugal
-    "352": ("LU", "<tg-emoji emoji-id='5224499567197700690'>🇱🇺</tg-emoji>"),  # Luxembourg
-    "353": ("IE", "<tg-emoji emoji-id='5222233374948602940'>🇮🇪</tg-emoji>"),  # Ireland
-    "354": ("IS", "<tg-emoji emoji-id='5222063229819172521'>🇮🇸</tg-emoji>"),  # Iceland
-    "355": ("AL", "<tg-emoji emoji-id='5224312057515486246'>🇦🇱</tg-emoji>"),  # Albania
-    "356": ("MT", "<tg-emoji emoji-id='5224312057515486246'>🇲🇹</tg-emoji>"),  # Malta
-    "357": ("CY", "<tg-emoji emoji-id='5224601903383457698'>🇨🇾</tg-emoji>"),  # Cyprus
-    "358": ("FI", "<tg-emoji emoji-id='5224282903277482188'>🇫🇮</tg-emoji>"),  # Finland
-    "359": ("BG", "<tg-emoji emoji-id='5224670399521892983'>🇧🇬</tg-emoji>"),  # Bulgaria
-    "370": ("LT", "<tg-emoji emoji-id='5224245902134226386'>🇱🇹</tg-emoji>"),  # Lithuania
-    "371": ("LV", "<tg-emoji emoji-id='5224245902134226386'>🇱🇻</tg-emoji>"),  # Latvia
-    "372": ("EE", "<tg-emoji emoji-id='5224245902134226386'>🇪🇪</tg-emoji>"),  # Estonia
-    "373": ("MD", "<tg-emoji emoji-id='5222273794885826118'>🇲🇩</tg-emoji>"),  # Moldova
-    "374": ("AM", "<tg-emoji emoji-id='5224369957969603463'>🇦🇲</tg-emoji>"),  # Armenia
-    "375": ("BY", "<tg-emoji emoji-id='5280820319458707404'>🇧🇾</tg-emoji>"),  # Belarus
-    "376": ("AD", "<tg-emoji emoji-id='5221987861733061751'>🇦🇩</tg-emoji>"),  # Andorra
-    "377": ("MC", "<tg-emoji emoji-id='5221937224068640464'>🇲🇨</tg-emoji>"),  # Monaco
-    "378": ("SM", "<tg-emoji emoji-id='5224312057515486246'>🇸🇲</tg-emoji>"),  # San Marino
-    "380": ("UA", "<tg-emoji emoji-id='5222250679371839695'>🇺🇦</tg-emoji>"),  # Ukraine
-    "381": ("RS", "<tg-emoji emoji-id='5222145396838512729'>🇷🇸</tg-emoji>"),  # Serbia
-    "382": ("ME", "<tg-emoji emoji-id='5224463399278096980'>🇲🇪</tg-emoji>"),  # Montenegro
-    "383": ("XK", "<tg-emoji emoji-id='5222145396838512729'>🇽🇰</tg-emoji>"),  # Kosovo
-    "385": ("HR", "<tg-emoji emoji-id='5224660718665607511'>🇭🇷</tg-emoji>"),  # Croatia
-    "386": ("SI", "<tg-emoji emoji-id='5224660718665607511'>🇸🇮</tg-emoji>"),  # Slovenia
-    "387": ("BA", "<tg-emoji emoji-id='5224660718665607511'>🇧🇦</tg-emoji>"),  # Bosnia
-    "389": ("MK", "<tg-emoji emoji-id='5222470435668505656'>🇲🇰</tg-emoji>"),  # North Macedonia
-    "420": ("CZ", "<tg-emoji emoji-id='5224499567197700690'>🇨🇿</tg-emoji>"),  # Czech Republic
-    "421": ("SK", "<tg-emoji emoji-id='5222401879400528047'>🇸🇰</tg-emoji>"),  # Slovakia
-    "423": ("LI", "<tg-emoji emoji-id='5224520754271366661'>🇱🇮</tg-emoji>"),  # Liechtenstein
+    "30": ("GR", "🇬🇷"),  # Greece
+    "31": ("NL", "🇳🇱"),  # Netherlands
+    "32": ("BE", "🇧🇪"),  # Belgium
+    "33": ("FR", "🇫🇷"),  # France
+    "34": ("ES", "🇪🇸"),  # Spain
+    "36": ("HU", "🇭🇺"),  # Hungary
+    "39": ("IT", "🇮🇹"),  # Italy
+    "40": ("RO", "🇷🇴"),  # Romania
+    "41": ("CH", "🇨🇭"),  # Switzerland
+    "43": ("AT", "🇦🇹"),  # Austria
+    "44": ("GB", "🇬🇧"),  # United Kingdom
+    "45": ("DK", "🇩🇰"),  # Denmark
+    "46": ("SE", "🇸🇪"),  # Sweden
+    "47": ("NO", "🇳🇴"),  # Norway
+    "48": ("PL", "🇵🇱"),  # Poland
+    "49": ("DE", "🇩🇪"),  # Germany
+    "350": ("GI", "🇬🇮"),  # Gibraltar
+    "351": ("PT", "🇵🇹"),  # Portugal
+    "352": ("LU", "🇱🇺"),  # Luxembourg
+    "353": ("IE", "🇮🇪"),  # Ireland
+    "354": ("IS", "🇮🇸"),  # Iceland
+    "355": ("AL", "🇦🇱"),  # Albania
+    "356": ("MT", "🇲🇹"),  # Malta
+    "357": ("CY", "🇨🇾"),  # Cyprus
+    "358": ("FI", "🇫🇮"),  # Finland
+    "359": ("BG", "🇧🇬"),  # Bulgaria
+    "370": ("LT", "🇱🇹"),  # Lithuania
+    "371": ("LV", "🇱🇻"),  # Latvia
+    "372": ("EE", "🇪🇪"),  # Estonia
+    "373": ("MD", "🇲🇩"),  # Moldova
+    "374": ("AM", "🇦🇲"),  # Armenia
+    "375": ("BY", "🇧🇾"),  # Belarus
+    "376": ("AD", "🇦🇩"),  # Andorra
+    "377": ("MC", "🇲🇨"),  # Monaco
+    "378": ("SM", "🇸🇲"),  # San Marino
+    "380": ("UA", "🇺🇦"),  # Ukraine
+    "381": ("RS", "🇷🇸"),  # Serbia
+    "382": ("ME", "🇲🇪"),  # Montenegro
+    "383": ("XK", "🇽🇰"),  # Kosovo
+    "385": ("HR", "🇭🇷"),  # Croatia
+    "386": ("SI", "🇸🇮"),  # Slovenia
+    "387": ("BA", "🇧🇦"),  # Bosnia
+    "389": ("MK", "🇲🇰"),  # North Macedonia
+    "420": ("CZ", "🇨🇿"),  # Czech Republic
+    "421": ("SK", "🇸🇰"),  # Slovakia
+    "423": ("LI", "🇱🇮"),  # Liechtenstein
 
     # Americas
-    "1": ("US", "<tg-emoji emoji-id='5224321781321442532'>🇺🇸</tg-emoji>"),  # United States
-    "51": ("PE", "<tg-emoji emoji-id='5224482026551258766'>🇵🇪</tg-emoji>"),  # Peru
-    "52": ("MX", "<tg-emoji emoji-id='5224482026551258766'>🇲🇽</tg-emoji>"),  # Mexico
-    "53": ("CU", "<tg-emoji emoji-id='5224482026551258766'>🇨🇺</tg-emoji>"),  # Cuba
-    "54": ("AR", "<tg-emoji emoji-id='5224482026551258766'>🇦🇷</tg-emoji>"),  # Argentina
-    "55": ("BR", "<tg-emoji emoji-id='5224688610183228070'>🇧🇷</tg-emoji>"),  # Brazil
-    "56": ("CL", "<tg-emoji emoji-id='5224482026551258766'>🇨🇱</tg-emoji>"),  # Chile
-    "57": ("CO", "<tg-emoji emoji-id='5224455152940886669'>🇨🇴</tg-emoji>"),  # Colombia
-    "58": ("VE", "<tg-emoji emoji-id='5434009132753499322'>🇻🇪</tg-emoji>"),  # Venezuela
-    "501": ("BZ", "<tg-emoji emoji-id='5224482026551258766'>🇧🇿</tg-emoji>"),  # Belize
-    "502": ("GT", "<tg-emoji emoji-id='5222128302868672826'>🇬🇹</tg-emoji>"),  # Guatemala
-    "503": ("SV", "<tg-emoji emoji-id='5222128302868672826'>🇸🇻</tg-emoji>"),  # El Salvador
-    "504": ("HN", "<tg-emoji emoji-id='5222229234600130045'>🇭🇳</tg-emoji>"),  # Honduras
-    "505": ("NI", "<tg-emoji emoji-id='5222128302868672826'>🇳🇮</tg-emoji>"),  # Nicaragua
-    "506": ("CR", "<tg-emoji emoji-id='5222128302868672826'>🇨🇷</tg-emoji>"),  # Costa Rica
-    "507": ("PA", "<tg-emoji emoji-id='5222111719999945107'>🇵🇦</tg-emoji>"),  # Panama
-    "509": ("HT", "<tg-emoji emoji-id='5224683146984831315'>🇭🇹</tg-emoji>"),  # Haiti
-    "591": ("BO", "<tg-emoji emoji-id='5224482026551258766'>🇧🇴</tg-emoji>"),  # Bolivia
-    "592": ("GY", "<tg-emoji emoji-id='5224570532942329532'>🇬🇾</tg-emoji>"),  # Guyana
-    "593": ("EC", "<tg-emoji emoji-id='5224191188545840926'>🇪🇨</tg-emoji>"),  # Ecuador
-    "595": ("PY", "<tg-emoji emoji-id='5222152565138929235'>🇵🇾</tg-emoji>"),  # Paraguay
-    "597": ("SR", "<tg-emoji emoji-id='5224567367551428669'>🇸🇷</tg-emoji>"),  # Suriname
-    "598": ("UY", "<tg-emoji emoji-id='5222466849370813232'>🇺🇾</tg-emoji>"),  # Uruguay
+    "1": ("US", "🇺🇸"),  # United States
+    "51": ("PE", "🇵🇪"),  # Peru
+    "52": ("MX", "🇲🇽"),  # Mexico
+    "53": ("CU", "🇨🇺"),  # Cuba
+    "54": ("AR", "🇦🇷"),  # Argentina
+    "55": ("BR", "🇧🇷"),  # Brazil
+    "56": ("CL", "🇨🇱"),  # Chile
+    "57": ("CO", "🇨🇴"),  # Colombia
+    "58": ("VE", "🇻🇪"),  # Venezuela
+    "501": ("BZ", "🇧🇿"),  # Belize
+    "502": ("GT", "🇬🇹"),  # Guatemala
+    "503": ("SV", "🇸🇻"),  # El Salvador
+    "504": ("HN", "🇭🇳"),  # Honduras
+    "505": ("NI", "🇳🇮"),  # Nicaragua
+    "506": ("CR", "🇨🇷"),  # Costa Rica
+    "507": ("PA", "🇵🇦"),  # Panama
+    "509": ("HT", "🇭🇹"),  # Haiti
+    "591": ("BO", "🇧🇴"),  # Bolivia
+    "592": ("GY", "🇬🇾"),  # Guyana
+    "593": ("EC", "🇪🇨"),  # Ecuador
+    "595": ("PY", "🇵🇾"),  # Paraguay
+    "597": ("SR", "🇸🇷"),  # Suriname
+    "598": ("UY", "🇺🇾"),  # Uruguay
 
     # Oceania
-    "61": ("AU", "<tg-emoji emoji-id='5224573595254009705'>🇦🇺</tg-emoji>"),  # Australia
-    "64": ("NZ", "<tg-emoji emoji-id='5224573595254009705'>🇳🇿</tg-emoji>"),  # New Zealand
-    "670": ("TL", "<tg-emoji emoji-id='5224515905253291409'>🇹🇱</tg-emoji>"),  # Timor-Leste
-    "673": ("BN", "<tg-emoji emoji-id='5224312886444174057'>🇧🇳</tg-emoji>"),  # Brunei
-    "674": ("NR", "<tg-emoji emoji-id='5224573595254009705'>🇳🇷</tg-emoji>"),  # Nauru
-    "675": ("PG", "<tg-emoji emoji-id='5224500164198149905'>🇵🇬</tg-emoji>"),  # Papua New Guinea
-    "676": ("TO", "<tg-emoji emoji-id='5224573595254009705'>🇹🇴</tg-emoji>"),  # Tonga
-    "677": ("SB", "<tg-emoji emoji-id='5222290588207954120'>🇸🇧</tg-emoji>"),  # Solomon Islands
-    "678": ("VU", "<tg-emoji emoji-id='5222126748090512778'>🇻🇺</tg-emoji>"),  # Vanuatu
-    "679": ("FJ", "<tg-emoji emoji-id='5221962676044838178'>🇫🇯</tg-emoji>"),  # Fiji
-    "680": ("PW", "<tg-emoji emoji-id='5224573595254009705'>🇵🇼</tg-emoji>"),  # Palau
-    "685": ("WS", "<tg-emoji emoji-id='5224660353593387686'>🇼🇸</tg-emoji>"),  # Samoa
-    "686": ("KI", "<tg-emoji emoji-id='5224573595254009705'>🇰🇮</tg-emoji>"),  # Kiribati
-    "687": ("NC", "<tg-emoji emoji-id='5224573595254009705'>🇳🇨</tg-emoji>"),  # New Caledonia
-    "688": ("TV", "<tg-emoji emoji-id='5224573595254009705'>🇹🇻</tg-emoji>"),  # Tuvalu
-    "689": ("PF", "<tg-emoji emoji-id='5224573595254009705'>🇵🇫</tg-emoji>"),  # French Polynesia
-    "691": ("FM", "<tg-emoji emoji-id='5224573595254009705'>🇫🇲</tg-emoji>"),  # Micronesia
-    "692": ("MH", "<tg-emoji emoji-id='5224573595254009705'>🇲🇭</tg-emoji>"),  # Marshall Islands
+    "61": ("AU", "🇦🇺"),  # Australia
+    "64": ("NZ", "🇳🇿"),  # New Zealand
+    "670": ("TL", "🇹🇱"),  # Timor-Leste
+    "673": ("BN", "🇧🇳"),  # Brunei
+    "674": ("NR", "🇳🇷"),  # Nauru
+    "675": ("PG", "🇵🇬"),  # Papua New Guinea
+    "676": ("TO", "🇹🇴"),  # Tonga
+    "677": ("SB", "🇸🇧"),  # Solomon Islands
+    "678": ("VU", "🇻🇺"),  # Vanuatu
+    "679": ("FJ", "🇫🇯"),  # Fiji
+    "680": ("PW", "🇵🇼"),  # Palau
+    "685": ("WS", "🇼🇸"),  # Samoa
+    "686": ("KI", "🇰🇮"),  # Kiribati
+    "687": ("NC", "🇳🇨"),  # New Caledonia
+    "688": ("TV", "🇹🇻"),  # Tuvalu
+    "689": ("PF", "🇵🇫"),  # French Polynesia
+    "691": ("FM", "🇫🇲"),  # Micronesia
+    "692": ("MH", "🇲🇭"),  # Marshall Islands
 
     # Special Flags
-    "scotland": ("SCT", "<tg-emoji emoji-id='5224580312582861623'>🏴󠁧󠁢󠁳󠁣󠁴󠁿</tg-emoji>"),  # Scotland
-    "wales": ("WLS", "<tg-emoji emoji-id='5224431333052264232'>🏴󠁧󠁢󠁷󠁬󠁳󠁿</tg-emoji>"),  # Wales
-    "eu": ("EU", "<tg-emoji emoji-id='5222108911091331711'>🇪🇺</tg-emoji>"),  # European Union
-    "un": ("UN", "<tg-emoji emoji-id='5451772687993031127'>🇺🇳</tg-emoji>"),  # United Nations
+    "scotland": ("SCT", "🏴󠁧󠁢󠁳󠁣󠁴󠁿"),  # Scotland
+    "wales": ("WLS", "🏴󠁧󠁢󠁷󠁬󠁳󠁿"),  # Wales
+    "eu": ("EU", "🇪🇺"),  # European Union
+    "un": ("UN", "🇺🇳"),  # United Nations
 }
 
 # ================= YOUR EXACT MESSAGE AND KEYBOARD FORMAT =================
@@ -274,36 +299,30 @@ def send_to_telegram(short_code, flag_emoji, service, service_icon, custom_numbe
 {POWER_ICON} 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈  <a href="https://t.me/tamim_amv">𝙏𝘼𝙈𝙄𝙈</a> {POWER_EYE}
 """
     
-    # YOUR EXACT KEYBOARD FORMAT (EXACTLY AS YOU PROVIDED)
+    # YOUR EXACT KEYBOARD FORMAT (EXACTLY AS YOU PROVIDED, FIXED FOR STANDARD BOT API)
     keyboard = {
         "inline_keyboard": [
             [
                 {
                     "text": otp_code,
-                    "icon_custom_emoji_id": "6176966310920983412",
-                    "copy_text": {"text": otp_code},
-                    "style": "primary"
+                    "callback_data": f"copy_{otp_code}"
                 }
             ],
             [
                 {
                     "text": "Number Bot",
-                    "icon_custom_emoji_id": "5231197925178089666",
-                    "url": "https://t.me/sharknumber2bot",
-                    "style": "danger"
+                    "url": "https://t.me/sharknumber2bot"
                 },
                 {
                     "text": "Method",
-                    "icon_custom_emoji_id": "5942902988564600402",
-                    "url": "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
-                    "style": "success"
+                    "url": "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz"
                 }
             ]
         ]
     }
     
     payload = {
-        "chat_id": CHAT_ID,
+        "chat_id": OWNER_ID if OWNER_ID else CHAT_ID,
         "text": msg,
         "parse_mode": "HTML",
         "reply_markup": json.dumps(keyboard),
@@ -320,6 +339,28 @@ def send_to_telegram(short_code, flag_emoji, service, service_icon, custom_numbe
     except requests.exceptions.RequestException as e:
         print(f"[❌] Telegram request error: {e}")
         return False
+
+def notify_owner_startup():
+    """Send a startup message to the owner for testing"""
+    if not OWNER_ID:
+        print("[⚠️] OWNER_ID not found in .env. Skipping startup notification.")
+        return
+    
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": OWNER_ID,
+        "text": f"🚀 <b>Shark Bot Scraper Started!</b>\n\n📅 Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n🤖 Bot: @sharknumber2bot\n\nMonitoring <b>{CHAT_ID}</b> for new SMS.",
+        "parse_mode": "HTML"
+    }
+    
+    try:
+        res = requests.post(url, data=payload, timeout=10)
+        if res.status_code == 200:
+            print(f"[✅] Startup message sent to owner ID: {OWNER_ID}")
+        else:
+            print(f"[❌] Failed to notify owner: {res.status_code} - {res.text}")
+    except Exception as e:
+        print(f"[❌] Error sending startup message: {e}")
 
 # ================= HELPER FUNCTIONS =================
 def detect_country_from_number(number):
@@ -571,9 +612,11 @@ def extract_sms(driver):
             
             # Parse date/time
             try:
-                timestamp = datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
+                # Use current local time with Cairo/Dhaka offset logic if needed, 
+                # but better to just use current time for processing
+                timestamp = datetime.now()
             except:
-                timestamp = datetime.utcnow() + timedelta(hours=6)  # Dhaka time
+                timestamp = datetime.now()
 
             # Extract OTP code using improved function
             otp_code = extract_otp_code(message)
@@ -704,6 +747,9 @@ def main():
         if not wait_for_login(driver):
             print("[❌] Login failed. Exiting...")
             return
+
+        # Notify owner that bot has started
+        notify_owner_startup()
 
         print("[✅] Login verified. Starting OTP monitoring...")
         print("[🔄] Checking for new SMS every 16 seconds...")

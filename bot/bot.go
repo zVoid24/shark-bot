@@ -4,6 +4,7 @@ import (
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
+	"shark_bot/internal/processednumber"
 	"shark_bot/internal/seennumber"
 	"shark_bot/internal/settings"
 	"shark_bot/internal/stats"
@@ -25,6 +26,8 @@ type Bot struct {
 	settingsSvc    *settings.Service
 	statsSvc       *stats.Service
 	seenSvc        *seennumber.Service
+	processedSvc   *processednumber.Service
+	scraper        *Scraper
 	targetGroupIDs map[int64]bool
 	ownerIDs       []string
 	cooldownSecs   int
@@ -50,6 +53,8 @@ func New(
 	settingsSvc *settings.Service,
 	statsSvc *stats.Service,
 	seenSvc *seennumber.Service,
+	processedSvc *processednumber.Service,
+	scraper *Scraper,
 	targetGroupIDs []int64,
 	ownerIDs []string,
 	cooldownSecs int,
@@ -67,6 +72,8 @@ func New(
 		settingsSvc:    settingsSvc,
 		statsSvc:       statsSvc,
 		seenSvc:        seenSvc,
+		processedSvc:   processedSvc,
+		scraper:        scraper,
 		targetGroupIDs: groupMap,
 		ownerIDs:       ownerIDs,
 		cooldownSecs:   cooldownSecs,
@@ -93,7 +100,6 @@ func (b *Bot) Start() {
 
 // handleUpdate routes each Telegram update and logs it.
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
-	log.Info("incoming update detected", "id", update.UpdateID, "has_message", update.Message != nil)
 	switch {
 	case update.CallbackQuery != nil:
 		log.Info("callback", "user", update.CallbackQuery.From.ID, "data", update.CallbackQuery.Data)

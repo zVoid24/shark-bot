@@ -30,10 +30,18 @@ type AppConfig struct {
 	Env     string
 }
 
+type ScraperConfig struct {
+	LoginURL string
+	SMSURL   string
+	Username string
+	Password string
+}
+
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Telegram TelegramConfig
+	Scraper  ScraperConfig
 }
 
 var cfg *Config
@@ -135,10 +143,19 @@ func Load() *Config {
 		CooldownSecs:   cooldown,
 	}
 
+	// --- Scraper ---
+	scraper := ScraperConfig{
+		LoginURL: getDefault("SCRAPER_LOGIN_URL", "http://185.2.83.39/ints/login"),
+		SMSURL:   getDefault("SCRAPER_SMS_URL", "http://185.2.83.39/ints/agent/SMSCDRReports"),
+		Username: os.Getenv("SCRAPER_USERNAME"),
+		Password: os.Getenv("SCRAPER_PASSWORD"),
+	}
+
 	cfg = &Config{
 		App:      app,
 		Database: dbCfg,
 		Telegram: tg,
+		Scraper:  scraper,
 	}
 
 	return cfg
