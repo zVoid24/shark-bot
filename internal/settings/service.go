@@ -17,10 +17,6 @@ func (s *Service) Set(key, value string) error {
 	return s.repo.Set(key, value)
 }
 
-func (s *Service) GetGroupLink() string {
-	return s.repo.GetGroupLink()
-}
-
 func (s *Service) GetRemovePolicy(platform, country string) bool {
 	return s.repo.GetRemovePolicy(platform, country)
 }

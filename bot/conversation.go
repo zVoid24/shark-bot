@@ -11,7 +11,6 @@ import (
 // Conversation states
 const (
 	convStepNone           = 0
-	convStepAddChatID      = 1
 	convStepChoosePlat     = 2
 	convStepNewPlatName    = 3
 	convStepChooseCountry  = 4
@@ -54,24 +53,6 @@ func (b *Bot) handleConversationText(msg *tgbotapi.Message) bool {
 	}
 
 	switch ctx.Step {
-	// --- Add Chat ID ---
-	case convStepAddChatID:
-		added := 0
-		for _, line := range strings.Split(msg.Text, "\n") {
-			var cid int64
-			n, _ := fmt.Sscanf(strings.TrimSpace(line), "%d", &cid)
-			if n == 1 {
-				b.targetGroupIDs[cid] = true
-				added++
-			}
-		}
-		b.setConvState(msg.From.ID, nil)
-		if added > 0 {
-			b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>Successfully added %d new Chat ID(s).</b>", added))
-		} else {
-			b.sendHTML(msg.Chat.ID, "<b>No valid Chat IDs added.</b>")
-		}
-		return true
 
 	// --- Add Number: Choose Platform ---
 	case convStepChoosePlat:

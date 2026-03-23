@@ -33,8 +33,6 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		b.handleResetAll(msg)
 	case "all":
 		b.handleBroadcast(msg)
-	case "setgroupe":
-		b.handleSetGroupLink(msg)
 	case "numberlimit":
 		b.handleSetNumberLimit(msg)
 	case "numberremove":
@@ -43,8 +41,6 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		b.handleAddNumber(msg)
 	case "removenumber":
 		b.handleRemoveNumber(msg)
-	case "addchatid":
-		b.handleAddChatID(msg)
 	case "cancel":
 		b.handleCancel(msg)
 	case "getnumber":

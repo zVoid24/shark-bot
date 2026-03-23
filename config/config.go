@@ -19,10 +19,9 @@ type DatabaseConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken       string
-	TargetGroupIDs []int64
-	OwnerIDs       []string
-	CooldownSecs   int
+	BotToken     string
+	OwnerIDs     []string
+	CooldownSecs int
 }
 
 type AppConfig struct {
@@ -132,15 +131,13 @@ func Load() *Config {
 	}
 
 	// --- Telegram ---
-	groupIDsRaw := getDefault("TARGET_GROUP_IDS", getDefault("TARGET_GROUP_ID", ""))
 	ownerIDsRaw := mustGet("OWNER_IDS")
 	cooldown, _ := strconv.Atoi(getDefault("COOLDOWN_SECONDS", "10"))
 
 	tg := TelegramConfig{
-		BotToken:       mustGet("BOT_TOKEN"),
-		TargetGroupIDs: parseInt64List(groupIDsRaw),
-		OwnerIDs:       parseStringList(ownerIDsRaw),
-		CooldownSecs:   cooldown,
+		BotToken:     mustGet("BOT_TOKEN"),
+		OwnerIDs:     parseStringList(ownerIDsRaw),
+		CooldownSecs: cooldown,
 	}
 
 	// --- Scraper ---

@@ -89,7 +89,6 @@ func Serve() {
 		seenSvc,
 		processedSvc,
 		scrp,
-		cnf.Telegram.TargetGroupIDs,
 		cnf.Telegram.OwnerIDs,
 		cnf.Telegram.CooldownSecs,
 	)

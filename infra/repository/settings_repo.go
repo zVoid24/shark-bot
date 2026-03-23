@@ -32,14 +32,6 @@ func (r *SettingsRepo) Set(key, value string) error {
 	return err
 }
 
-func (r *SettingsRepo) GetGroupLink() string {
-	val, _ := r.Get("group_link")
-	if val == "" {
-		return "https://t.me/tgwscreatebdotp"
-	}
-	return val
-}
-
 func (r *SettingsRepo) GetRemovePolicy(platform, country string) bool {
 	key := "remove_policy::" + strings.ToLower(platform) + "::" + strings.ToLower(country)
 	val, _ := r.Get(key)

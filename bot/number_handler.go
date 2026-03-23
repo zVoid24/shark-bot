@@ -3,7 +3,6 @@ package bot
 import (
 	"fmt"
 	"shark_bot/pkg/logger"
-	"strings"
 	"time"
 
 	"shark_bot/internal/activenumber"
@@ -143,8 +142,6 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	// Update message_id for all newly assigned numbers (in case Insert used a stale msgID)
 	_ = b.activeSvc.UpdateMessageID(userIDStr, int64(msgID))
 
-	groupLink := b.settingsSvc.GetGroupLink()
-
 	numDisplay := ""
 	for _, n := range numbers {
 		numDisplay += fmt.Sprintf("<code>%s</code>\n", n)
@@ -157,9 +154,6 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("🔄 Change Number",
 				fmt.Sprintf("change_number::%s::%s", platform, country)),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("OTP Groupe 👥", groupLink),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Back",
@@ -187,29 +181,4 @@ func (b *Bot) handleMyStatus(msg *tgbotapi.Message) {
 	}
 	text += fmt.Sprintf("\n<b>Total:</b> <code>%d</code>", total)
 	b.sendHTML(msg.Chat.ID, text)
-}
-
-// handleGroupMessage pushes group messages to OTP channel
-func (b *Bot) handleGroupMessage(msg *tgbotapi.Message) {
-	if msg == nil {
-		return
-	}
-	text := msg.Text
-	if text == "" {
-		text = msg.Caption
-	}
-	if text == "" || strings.HasPrefix(text, "/") {
-		return
-	}
-	if !b.targetGroupIDs[msg.Chat.ID] {
-		logger.L.Warn("group message ignored: chat ID not in allowed list", "chat_id", msg.Chat.ID)
-		return
-	}
-	logger.L.Info("group message accepted for processing", "chat_id", msg.Chat.ID)
-	b.otpChan <- otpMessage{
-		text:        text,
-		chatID:      msg.Chat.ID,
-		messageID:   msg.MessageID,
-		replyMarkup: msg.ReplyMarkup,
-	}
 }

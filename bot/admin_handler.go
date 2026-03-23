@@ -20,11 +20,9 @@ const adminHelp = `<b>--- Admin Command Panel ---</b>
 <code>/removenumber</code> - Remove a country's numbers from a platform.
 <code>/numberlimit [Plat] [Coun] [Limit]</code> - Set limit per user.
 <code>/numberremove [Plat] [Coun] [on/off]</code> - Set delete policy on change.
-<code>/cancel</code> - Cancel the current operation.
 
 <b><u>Configuration</u></b>
-<code>/addchatid</code> - Add new Target Group Chat IDs.
-<code>/setgroupe [link]</code> - Set the OTP Group link.
+<code>/cancel</code> - Cancel the current operation.
 
 <b><u>User Management</u></b>
 <code>/block [user_id]</code> - Block a user.
@@ -255,19 +253,6 @@ func (b *Bot) runBroadcast(userIDs []string, text string) {
 	}
 }
 
-func (b *Bot) handleSetGroupLink(msg *tgbotapi.Message) {
-	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
-		return
-	}
-	args := strings.Fields(msg.CommandArguments())
-	if len(args) == 0 || !strings.HasPrefix(args[0], "http") {
-		b.sendHTML(msg.Chat.ID, "<b>Usage: /setgroupe [link]</b>")
-		return
-	}
-	_ = b.settingsSvc.Set("group_link", args[0])
-	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>OTP Group link updated to:</b>\n%s", args[0]))
-}
-
 func (b *Bot) handleSetNumberLimit(msg *tgbotapi.Message) {
 	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
 		return
@@ -295,13 +280,4 @@ func (b *Bot) handleToggleRemovePolicy(msg *tgbotapi.Message) {
 	plat, coun, status := parts[0], parts[1], parts[2]
 	_ = b.settingsSvc.SetRemovePolicy(plat, coun, status)
 	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>✅ Configuration Updated!</b>\n\n<b>Platform:</b> %s\n<b>Country:</b> %s\n<b>Remove on Change:</b> %s", plat, coun, strings.ToUpper(status)))
-}
-
-func (b *Bot) handleAddChatID(msg *tgbotapi.Message) {
-	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
-		return
-	}
-	// Enter conversation state for adding chat IDs
-	b.setConvState(msg.From.ID, &convContext{Step: convStepAddChatID})
-	b.removeKeyboard(msg.Chat.ID, "<b>Enter the new Target Group Chat ID(s), one per line.</b>")
 }

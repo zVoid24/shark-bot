@@ -18,30 +18,23 @@ var log = logger.New("bot")
 
 // Bot aggregates all dependencies via domain service interfaces.
 type Bot struct {
-	api            *tgbotapi.BotAPI
-	userSvc        *user.Service
-	adminSvc       *admin.Service
-	numberSvc      *number.Service
-	activeSvc      *activenumber.Service
-	settingsSvc    *settings.Service
-	statsSvc       *stats.Service
-	seenSvc        *seennumber.Service
-	processedSvc   *processednumber.Service
-	scraper        *Scraper
-	targetGroupIDs map[int64]bool
-	ownerIDs       []string
-	cooldownSecs   int
-	otpChan        chan otpMessage
+	api          *tgbotapi.BotAPI
+	userSvc      *user.Service
+	adminSvc     *admin.Service
+	numberSvc    *number.Service
+	activeSvc    *activenumber.Service
+	settingsSvc  *settings.Service
+	statsSvc     *stats.Service
+	seenSvc      *seennumber.Service
+	processedSvc *processednumber.Service
+	scraper      *Scraper
+	ownerIDs     []string
+	cooldownSecs int
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
 
-type otpMessage struct {
-	text        string
-	chatID      int64
-	messageID   int
-	replyMarkup *tgbotapi.InlineKeyboardMarkup
-}
+// otpMessage is removed as it's no longer needed for group chats.
 
 // New creates the Bot instance with service-layer dependencies.
 func New(
@@ -55,30 +48,23 @@ func New(
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
 	scraper *Scraper,
-	targetGroupIDs []int64,
 	ownerIDs []string,
 	cooldownSecs int,
 ) *Bot {
-	groupMap := make(map[int64]bool)
-	for _, id := range targetGroupIDs {
-		groupMap[id] = true
-	}
 	return &Bot{
-		api:            api,
-		userSvc:        userSvc,
-		adminSvc:       adminSvc,
-		numberSvc:      numberSvc,
-		activeSvc:      activeSvc,
-		settingsSvc:    settingsSvc,
-		statsSvc:       statsSvc,
-		seenSvc:        seenSvc,
-		processedSvc:   processedSvc,
-		scraper:        scraper,
-		targetGroupIDs: groupMap,
-		ownerIDs:       ownerIDs,
-		cooldownSecs:   cooldownSecs,
-		otpChan:        make(chan otpMessage, 256),
-		convState:      make(map[int64]*convContext),
+		api:          api,
+		userSvc:      userSvc,
+		adminSvc:     adminSvc,
+		numberSvc:    numberSvc,
+		activeSvc:    activeSvc,
+		settingsSvc:  settingsSvc,
+		statsSvc:     statsSvc,
+		seenSvc:      seenSvc,
+		processedSvc: processedSvc,
+		scraper:      scraper,
+		ownerIDs:     ownerIDs,
+		cooldownSecs: cooldownSecs,
+		convState:    make(map[int64]*convContext),
 	}
 }
 
@@ -108,22 +94,6 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	case update.Message != nil && update.Message.Chat.IsPrivate():
 		log.Info("private message", "user", update.Message.From.ID, "text", update.Message.Text)
 		b.handlePrivateMessage(update.Message)
-
-	case update.Message != nil:
-		log.Info("group message", "chat", update.Message.Chat.ID, "user", update.Message.From.ID)
-		b.handleGroupMessage(update.Message)
-
-	case update.ChannelPost != nil:
-		log.Info("channel post", "chat", update.ChannelPost.Chat.ID)
-		b.handleGroupMessage(update.ChannelPost)
-
-	case update.EditedMessage != nil && !update.EditedMessage.Chat.IsPrivate():
-		log.Info("edited group message", "chat", update.EditedMessage.Chat.ID)
-		b.handleGroupMessage(update.EditedMessage)
-
-	case update.EditedChannelPost != nil:
-		log.Info("edited channel post", "chat", update.EditedChannelPost.Chat.ID)
-		b.handleGroupMessage(update.EditedChannelPost)
 	}
 }
 

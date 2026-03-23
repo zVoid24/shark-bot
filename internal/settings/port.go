@@ -4,7 +4,6 @@ package settings
 type Repository interface {
 	Get(key string) (string, error)
 	Set(key, value string) error
-	GetGroupLink() string
 	GetRemovePolicy(platform, country string) bool
 	SetRemovePolicy(platform, country, status string) error
 	GetNumberLimit(platform, country string) int
