@@ -1,9 +1,11 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -22,10 +24,16 @@ const (
 )
 
 type convContext struct {
-	Step     int
-	Platform string
-	Country  string
+	Step       int
+	Platform   string
+	Country    string
+	lastActive time.Time // updated on every setConvState call; used for TTL cleanup
 }
+
+// convStateTimeout is how long a conversation can be idle before it is
+// automatically removed from memory.  Ten minutes covers the slowest user
+// while still bounding memory growth on long-running VPS deployments.
+const convStateTimeout = 10 * time.Minute
 
 var convMu sync.Mutex
 
@@ -35,7 +43,31 @@ func (b *Bot) setConvState(userID int64, ctx *convContext) {
 	if ctx == nil {
 		delete(b.convState, userID)
 	} else {
+		ctx.lastActive = time.Now()
 		b.convState[userID] = ctx
+	}
+}
+
+// startConvCleaner runs as a background goroutine and removes stale
+// conversation states every five minutes to prevent unbounded memory growth.
+// It exits when ctx is cancelled (i.e., on shutdown).
+func (b *Bot) startConvCleaner(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now()
+			convMu.Lock()
+			for userID, state := range b.convState {
+				if now.Sub(state.lastActive) > convStateTimeout {
+					delete(b.convState, userID)
+				}
+			}
+			convMu.Unlock()
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
