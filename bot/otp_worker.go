@@ -39,20 +39,36 @@ var onlyDigits = regexp.MustCompile(`\D`)
 func (b *Bot) otpWorker() {
 	logger.L.Info("OTP Worker started")
 	for msg := range b.otpChan {
-		b.processOTPMessage(msg.text, msg.chatID, msg.messageID)
+		b.processOTPMessage(msg.text, msg.chatID, msg.messageID, msg.replyMarkup)
 	}
 }
 
-func (b *Bot) processOTPMessage(text string, chatID int64, messageID int) {
-	// 1. Extract OTP code
+func (b *Bot) processOTPMessage(text string, chatID int64, messageID int, markup *tgbotapi.InlineKeyboardMarkup) {
+	// 1. Extract OTP code FIRST (for monitor and matching)
 	otpCode := ""
-	for _, p := range otpPatterns {
-		m := p.FindStringSubmatch(text)
-		if len(m) > 1 {
-			code := spaceOrDash.ReplaceAllString(m[1], "")
-			if len(code) >= 4 {
-				otpCode = code
+	if markup != nil {
+		for _, row := range markup.InlineKeyboard {
+			for _, btn := range row {
+				cleanBtn := onlyDigits.ReplaceAllString(btn.Text, "")
+				if len(cleanBtn) >= 4 && len(cleanBtn) <= 8 {
+					otpCode = cleanBtn
+					break
+				}
+			}
+			if otpCode != "" {
 				break
+			}
+		}
+	}
+	if otpCode == "" {
+		for _, p := range otpPatterns {
+			m := p.FindStringSubmatch(text)
+			if len(m) > 1 {
+				code := spaceOrDash.ReplaceAllString(m[1], "")
+				if len(code) >= 4 {
+					otpCode = code
+					break
+				}
 			}
 		}
 	}
@@ -64,12 +80,40 @@ func (b *Bot) processOTPMessage(text string, chatID int64, messageID int) {
 		if len(m) > 1 {
 			cleaned := strings.ReplaceAll(m[1], " ", "")
 			cleaned = strings.ReplaceAll(cleaned, "-", "")
-			// Accept if it has mask characters or enough digits
 			digitOnly := onlyDigits.ReplaceAllString(cleaned, "")
 			hasMask := strings.ContainsAny(cleaned, "•*xX⁕")
 			if hasMask || len(digitOnly) >= 7 {
 				detectedNum = cleaned
 				break
+			}
+		}
+	}
+
+	// 3. Forward to owners if it's the test group
+	const testGroupID = -1003422191454
+	const dummyTestGroupID = -1003678266458
+	if chatID == testGroupID || chatID == dummyTestGroupID {
+		logger.L.Info("Forwarding message from test group to owners", "chat", chatID, "owner_count", len(b.ownerIDs))
+		monitorMsg := fmt.Sprintf("<b>🔍 Test Group Monitor</b>\n\n%s", text)
+		if otpCode != "" {
+			monitorMsg += fmt.Sprintf("\n\n<b>🔑 Extracted OTP:</b> <code>%s</code>", otpCode)
+		} else {
+			monitorMsg += "\n\n<b>❌ No OTP detected in this message.</b>"
+		}
+
+		for _, ownerIDStr := range b.ownerIDs {
+			var ownerChatID int64
+			fmt.Sscanf(ownerIDStr, "%d", &ownerChatID)
+			if ownerChatID != 0 {
+				msg := tgbotapi.NewMessage(ownerChatID, monitorMsg)
+				msg.ParseMode = tgbotapi.ModeHTML
+				// We DO NOT set ReplyMarkup to avoid parsing errors with custom buttons
+				_, err := b.api.Send(msg)
+				if err != nil {
+					logger.L.Error("failed to forward msg to owner", "owner", ownerIDStr, "err", err)
+				} else {
+					logger.L.Info("successfully forwarded msg to owner", "owner", ownerIDStr)
+				}
 			}
 		}
 	}

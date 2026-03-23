@@ -202,11 +202,14 @@ func (b *Bot) handleGroupMessage(msg *tgbotapi.Message) {
 		return
 	}
 	if !b.targetGroupIDs[msg.Chat.ID] {
+		logger.L.Warn("group message ignored: chat ID not in allowed list", "chat_id", msg.Chat.ID)
 		return
 	}
+	logger.L.Info("group message accepted for processing", "chat_id", msg.Chat.ID)
 	b.otpChan <- otpMessage{
-		text:      text,
-		chatID:    msg.Chat.ID,
-		messageID: msg.MessageID,
+		text:        text,
+		chatID:      msg.Chat.ID,
+		messageID:   msg.MessageID,
+		replyMarkup: msg.ReplyMarkup,
 	}
 }

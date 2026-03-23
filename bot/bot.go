@@ -34,9 +34,10 @@ type Bot struct {
 }
 
 type otpMessage struct {
-	text      string
-	chatID    int64
-	messageID int
+	text        string
+	chatID      int64
+	messageID   int
+	replyMarkup *tgbotapi.InlineKeyboardMarkup
 }
 
 // New creates the Bot instance with service-layer dependencies.
@@ -92,6 +93,7 @@ func (b *Bot) Start() {
 
 // handleUpdate routes each Telegram update and logs it.
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	log.Info("incoming update detected", "id", update.UpdateID, "has_message", update.Message != nil)
 	switch {
 	case update.CallbackQuery != nil:
 		log.Info("callback", "user", update.CallbackQuery.From.ID, "data", update.CallbackQuery.Data)
