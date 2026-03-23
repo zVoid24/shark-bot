@@ -1,6 +1,8 @@
 package bot
 
 import (
+	"fmt"
+	"net/http"
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
@@ -68,10 +70,10 @@ func New(
 	}
 }
 
-// Start begins the polling loop and background workers.
+// Start begins the polling loop.
 func (b *Bot) Start() {
 	b.api.Debug = false
-	log.Info("bot started", "username", b.api.Self.UserName)
+	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
 
 	go b.otpWorker()
 
@@ -80,6 +82,29 @@ func (b *Bot) Start() {
 	updates := b.api.GetUpdatesChan(u)
 
 	for update := range updates {
+		go b.handleUpdate(update)
+	}
+}
+
+// StartWebhook starts the bot using Telegram webhooks.
+func (b *Bot) StartWebhook(webhookURL string, port int) {
+	b.api.Debug = false
+	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
+
+	go b.otpWorker()
+
+	wh, _ := tgbotapi.NewWebhook(webhookURL)
+	_, err := b.api.Request(wh)
+	if err != nil {
+		log.Error("failed to set webhook", "err", err)
+		panic(err)
+	}
+
+	updates := b.api.ListenForWebhook("/")
+	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+
+	for update := range updates {
+		log.Info("<- incoming update", "id", update.UpdateID)
 		go b.handleUpdate(update)
 	}
 }

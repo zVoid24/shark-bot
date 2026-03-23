@@ -22,6 +22,8 @@ type TelegramConfig struct {
 	BotToken     string
 	OwnerIDs     []string
 	CooldownSecs int
+	WebhookURL   string
+	ListenPort   int
 }
 
 type AppConfig struct {
@@ -133,11 +135,14 @@ func Load() *Config {
 	// --- Telegram ---
 	ownerIDsRaw := mustGet("OWNER_IDS")
 	cooldown, _ := strconv.Atoi(getDefault("COOLDOWN_SECONDS", "10"))
+	listenPort, _ := strconv.Atoi(getDefault("LISTEN_PORT", "8080"))
 
 	tg := TelegramConfig{
 		BotToken:     mustGet("BOT_TOKEN"),
 		OwnerIDs:     parseStringList(ownerIDsRaw),
 		CooldownSecs: cooldown,
+		WebhookURL:   os.Getenv("WEBHOOK_URL"),
+		ListenPort:   listenPort,
 	}
 
 	// --- Scraper ---

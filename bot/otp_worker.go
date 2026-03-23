@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"math/rand"
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/processednumber"
 
@@ -48,13 +49,15 @@ func (b *Bot) otpWorker() {
 		}
 	}
 
-	ticker := time.NewTicker(16 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
+	for {
 		if b.scraper != nil {
 			b.pollScraper()
 		}
+		// 16s base + 0-4s jitter
+		jitter := time.Duration(rand.Intn(4000)) * time.Millisecond
+		wait := 16*time.Second + jitter
+		log.Info("scraper waiting", "duration", wait.String())
+		time.Sleep(wait)
 	}
 }
 
