@@ -1,0 +1,48 @@
+# Systemd unit file for Shark Bot on a Hostinger (or any Debian/Ubuntu) VPS.
+#
+# Quick-start:
+#   1. Build the binary:          go build -o /opt/shark-bot/shark-bot .
+#   2. Copy your env file:        cp .env /opt/shark-bot/.env
+#   3. Create a dedicated user:   sudo useradd --system --no-create-home sharkbot
+#   4. Set ownership:             sudo chown -R sharkbot:sharkbot /opt/shark-bot
+#   5. Install this unit file:    sudo cp deploy/shark-bot.service /etc/systemd/system/
+#   6. Enable & start:            sudo systemctl daemon-reload
+#                                 sudo systemctl enable --now shark-bot
+#
+# Useful commands:
+#   sudo systemctl status shark-bot      # check current state
+#   sudo journalctl -u shark-bot -f      # tail live logs
+#   sudo systemctl restart shark-bot     # rolling restart
+
+[Unit]
+Description=Shark Bot — Telegram OTP distribution bot
+# Start after the network stack and PostgreSQL are ready.
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=sharkbot
+Group=sharkbot
+WorkingDirectory=/opt/shark-bot
+
+# Load all environment variables from the .env file (no "export" needed).
+EnvironmentFile=/opt/shark-bot/.env
+
+ExecStart=/opt/shark-bot/shark-bot
+
+# Restart automatically on crash; wait 5 s between attempts.
+Restart=on-failure
+RestartSec=5s
+
+# Give the bot up to 30 s to finish in-flight OTP deliveries on shutdown
+# before systemd sends SIGKILL.  This matches the graceful-shutdown logic
+# built into Bot.Start() via WaitGroup.
+TimeoutStopSec=30
+
+# Basic hardening — sensible defaults for a VPS service process.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

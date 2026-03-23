@@ -1,6 +1,12 @@
 package bot
 
 import (
+	"context"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
@@ -13,6 +19,11 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+// workerPoolSize caps the number of Telegram update handlers running at the
+// same time.  This prevents goroutine/memory exhaustion on low-spec VPS hosts
+// while still handling bursts smoothly.
+const workerPoolSize = 50
 
 var log = logger.New("bot")
 
@@ -83,19 +94,55 @@ func New(
 }
 
 // Start begins the polling loop and background workers.
+// It blocks until a SIGINT or SIGTERM signal is received, then performs a
+// graceful shutdown: it stops accepting new updates and waits for all
+// in-flight handlers to finish before returning.
 func (b *Bot) Start() {
 	b.api.Debug = false
 	log.Info("bot started", "username", b.api.Self.UserName)
 
+	// ctx is cancelled when a shutdown signal arrives, which stops all
+	// background goroutines (OTP worker excluded — it also exits on process
+	// termination, but the conv-cleaner uses the context explicitly).
+	ctx, cancel := context.WithCancel(context.Background())
+
 	go b.otpWorker()
+	go b.startConvCleaner(ctx)
+
+	// Stop the Telegram polling loop when the OS asks us to shut down.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-quit
+		log.Info("shutdown signal received", "signal", sig.String())
+		cancel()                         // stop background goroutines
+		b.api.StopReceivingUpdates()     // close the updates channel
+	}()
+
+	// Semaphore that limits concurrent update handlers.
+	sem := make(chan struct{}, workerPoolSize)
+	var wg sync.WaitGroup
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := b.api.GetUpdatesChan(u)
 
 	for update := range updates {
-		go b.handleUpdate(update)
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(upd tgbotapi.Update) {
+			// Defers run LIFO: semaphore slot is freed first, then the
+			// WaitGroup is decremented, so capacity is restored before
+			// signalling completion to any wg.Wait() caller.
+			defer wg.Done()
+			defer func() { <-sem }()
+			b.handleUpdate(upd)
+		}(update)
 	}
+
+	// Wait for all in-flight handlers to complete before the process exits.
+	wg.Wait()
+	log.Info("all update handlers finished, bot stopped cleanly")
 }
 
 // handleUpdate routes each Telegram update and logs it.
