@@ -127,18 +127,33 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 }
 
 func (b *Bot) forwardToOwners(shortCode, flag, service, icon, masked, otp string) {
-	msgText := fmt.Sprintf("%s #%s %s <code>%s</code>\n\n⛩️ 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈 <a href=\"https://t.me/tamim_amv\">𝙏𝘼میم_amv</a> 👁",
+	msgText := fmt.Sprintf("%s #%s %s <code>%s</code>\n\n⛩️ 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈 <a href=\"https://t.me/zvoidois\">𝒵𝒶𝒽𝒾𝒹</a> 👁",
 		flag, shortCode, icon, masked)
 
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔑 "+otp, "copy_otp::"+otp),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("🤖 Number Bot", "https://t.me/sharknumber2bot"),
-			tgbotapi.NewInlineKeyboardButtonURL("📺 Method", "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz"),
-		),
-	)
+	// Custom button types to support copy_text which is missing in the library
+	type CopyTextButton struct {
+		Text string `json:"text"`
+	}
+	type CustomButton struct {
+		Text         string          `json:"text"`
+		CallbackData string          `json:"callback_data,omitempty"`
+		URL          string          `json:"url,omitempty"`
+		CopyText     *CopyTextButton `json:"copy_text,omitempty"`
+	}
+
+	keyboard := struct {
+		InlineKeyboard [][]CustomButton `json:"inline_keyboard"`
+	}{
+		InlineKeyboard: [][]CustomButton{
+			{
+				{Text: otp, CopyText: &CopyTextButton{Text: otp}},
+			},
+			{
+				{Text: "🤖 Number Bot", URL: "https://t.me/sharknumber2bot"},
+				{Text: "📺 Method", URL: "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz"},
+			},
+		},
+	}
 
 	for _, ownerIDStr := range b.ownerIDs {
 		var ownerChatID int64
@@ -203,6 +218,24 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 			fmt.Sprintf("<b>✅ OTP Received for</b> <code>%s</code>\n\n<b>🔑 Your %s Code:</b> <code>%s</code>",
 				fullNumber, service, otp))
 		otpMsg.ParseMode = tgbotapi.ModeHTML
+		// Custom button types to support copy_text
+		type CopyTextButton struct {
+			Text string `json:"text"`
+		}
+		type CustomButton struct {
+			Text     string          `json:"text"`
+			CopyText *CopyTextButton `json:"copy_text,omitempty"`
+		}
+
+		otpMsg.ReplyMarkup = struct {
+			InlineKeyboard [][]CustomButton `json:"inline_keyboard"`
+		}{
+			InlineKeyboard: [][]CustomButton{
+				{
+					{Text: otp, CopyText: &CopyTextButton{Text: otp}},
+				},
+			},
+		}
 		_, _ = b.api.Send(otpMsg)
 	}
 
