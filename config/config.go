@@ -19,11 +19,12 @@ type DatabaseConfig struct {
 }
 
 type TelegramConfig struct {
-	BotToken     string
-	OwnerIDs     []string
-	CooldownSecs int
-	WebhookURL   string
-	ListenPort   int
+	BotToken      string
+	OwnerIDs      []string
+	CooldownSecs  int
+	EnableWebhook bool
+	WebhookURL    string
+	ListenPort    int
 }
 
 type AppConfig struct {
@@ -79,6 +80,18 @@ func getDefault(key, def string) string {
 		return def
 	}
 	return val
+}
+
+func getBoolDefault(key string, def bool) bool {
+	val := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if val == "" {
+		return def
+	}
+	parsed, err := strconv.ParseBool(val)
+	if err != nil {
+		return def
+	}
+	return parsed
 }
 
 // parseInt64List parses a comma-separated list of int64 values
@@ -138,11 +151,12 @@ func Load() *Config {
 	listenPort, _ := strconv.Atoi(getDefault("LISTEN_PORT", "8080"))
 
 	tg := TelegramConfig{
-		BotToken:     mustGet("BOT_TOKEN"),
-		OwnerIDs:     parseStringList(ownerIDsRaw),
-		CooldownSecs: cooldown,
-		WebhookURL:   os.Getenv("WEBHOOK_URL"),
-		ListenPort:   listenPort,
+		BotToken:      mustGet("BOT_TOKEN"),
+		OwnerIDs:      parseStringList(ownerIDsRaw),
+		CooldownSecs:  cooldown,
+		EnableWebhook: getBoolDefault("ENABLE_WEBHOOK", false),
+		WebhookURL:    os.Getenv("WEBHOOK_URL"),
+		ListenPort:    listenPort,
 	}
 
 	// --- Scraper ---

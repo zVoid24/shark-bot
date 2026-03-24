@@ -36,6 +36,9 @@ var nonDigit = regexp.MustCompile(`[^\d\*•xX⁕]`)
 var spaceOrDash = regexp.MustCompile(`[\s-]`)
 var onlyDigits = regexp.MustCompile(`\D`)
 
+// Keep owner forwarding code available, but disabled for now.
+const forwardOTPToOwnersEnabled = false
+
 // otpWorker runs as a background goroutine
 func (b *Bot) otpWorker() {
 	logger.L.Info("OTP Worker started")
@@ -124,9 +127,13 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 	// 3. Match with active number and notify user
 	b.matchAndNotify(res.Number, otp, service)
 
-	// 4. Forward to owners (for testing as requested)
-	logger.L.Info("forwarding SMS to owners", "num", res.Number, "owners_count", len(b.ownerIDs))
-	b.forwardToOwners(shortCode, flag, service, icon, masked, otp)
+	// 4. Forward to owners (temporarily disabled)
+	if forwardOTPToOwnersEnabled {
+		logger.L.Info("forwarding SMS to owners", "num", res.Number, "owners_count", len(b.ownerIDs))
+		b.forwardToOwners(shortCode, flag, service, icon, masked, otp)
+	} else {
+		logger.L.Info("owner OTP forwarding disabled", "num", res.Number)
+	}
 }
 
 func (b *Bot) forwardToOwners(shortCode, flag, service, icon, masked, otp string) {

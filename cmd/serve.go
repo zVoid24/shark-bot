@@ -93,7 +93,7 @@ func Serve() {
 		cnf.Telegram.CooldownSecs,
 	)
 
-	if cnf.Telegram.WebhookURL != "" {
+	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {
 		b.StartWebhook(cnf.Telegram.WebhookURL, cnf.Telegram.ListenPort)
 	} else {
 		b.Start()

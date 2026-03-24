@@ -228,7 +228,13 @@ func (b *Bot) handleBroadcast(msg *tgbotapi.Message) {
 		b.sendHTML(msg.Chat.ID, "<b>Usage: /all [your message]</b>")
 		return
 	}
-	userIDs, _ := b.userSvc.GetAllUserIDs()
+	dbUserIDs, _ := b.userSvc.GetAllUserIDs()
+	registryUserIDs, err := getKnownUserIDs()
+	if err != nil {
+		log.Warn("failed to read user registry", "err", err)
+	}
+
+	userIDs := mergeUniqueUserIDs(dbUserIDs, registryUserIDs)
 	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>Starting broadcast to %d users...</b>", len(userIDs)))
 	go b.runBroadcast(userIDs, text)
 }

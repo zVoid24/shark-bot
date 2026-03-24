@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"path/filepath"
 	"sort"
 
 	"shark_bot/pkg/logger"
@@ -37,7 +36,7 @@ func Migrate(db *sqlx.DB) error {
 		if !e.IsDir() {
 			continue
 		}
-		upPath := filepath.Join("migrations", e.Name(), "up.sql")
+		upPath := "migrations/" + e.Name() + "/up.sql"
 		sql, err := migrationsFS.ReadFile(upPath)
 		if err != nil {
 			return fmt.Errorf("reading %s: %w", upPath, err)

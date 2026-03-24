@@ -73,6 +73,11 @@ func New(
 // Start begins the polling loop.
 func (b *Bot) Start() {
 	b.api.Debug = false
+	if _, err := b.api.Request(tgbotapi.DeleteWebhookConfig{DropPendingUpdates: true}); err != nil {
+		log.Warn("failed to delete existing webhook before polling", "err", err)
+	} else {
+		log.Info("cleared webhook before polling")
+	}
 	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
 
 	go b.otpWorker()
@@ -124,6 +129,8 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 
 // handlePrivateMessage routes private messages to the correct handler.
 func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
+	b.trackKnownUser(msg.From)
+
 	if msg.Text != "" && msg.Document == nil {
 		if b.handleConversationText(msg) {
 			return
