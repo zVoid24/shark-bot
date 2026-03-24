@@ -18,6 +18,9 @@ import (
 
 var log = logger.New("bot")
 
+// Temporary switch: keep scraper code intact but do not run the background worker.
+const otpWorkerEnabled = false
+
 // Bot aggregates all dependencies via domain service interfaces.
 type Bot struct {
 	api          *tgbotapi.BotAPI
@@ -80,7 +83,11 @@ func (b *Bot) Start() {
 	}
 	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
 
-	go b.otpWorker()
+	if otpWorkerEnabled {
+		go b.otpWorker()
+	} else {
+		log.Info("OTP worker disabled")
+	}
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -96,7 +103,11 @@ func (b *Bot) StartWebhook(webhookURL string, port int) {
 	b.api.Debug = false
 	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
 
-	go b.otpWorker()
+	if otpWorkerEnabled {
+		go b.otpWorker()
+	} else {
+		log.Info("OTP worker disabled")
+	}
 
 	wh, _ := tgbotapi.NewWebhook(webhookURL)
 	_, err := b.api.Request(wh)
