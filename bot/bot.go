@@ -87,21 +87,54 @@ func (b *Bot) Start() {
 }
 
 // StartWebhook starts the bot using Telegram webhooks.
-func (b *Bot) StartWebhook(webhookURL string, port int) {
+// If tlsCertPath and tlsKeyPath are set, it serves HTTPS directly (useful for IP-only servers).
+// If webhookCertPath is set, it uploads the public cert to Telegram for self-signed IP TLS.
+func (b *Bot) StartWebhook(webhookURL string, port int, tlsCertPath, tlsKeyPath, webhookCertPath string) {
 	b.api.Debug = false
 	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
 
 	go b.otpWorker()
 
-	wh, _ := tgbotapi.NewWebhook(webhookURL)
-	_, err := b.api.Request(wh)
+	var (
+		wh  tgbotapi.WebhookConfig
+		err error
+	)
+
+	if webhookCertPath != "" {
+		wh, err = tgbotapi.NewWebhookWithCert(webhookURL, tgbotapi.FilePath(webhookCertPath))
+	} else {
+		wh, err = tgbotapi.NewWebhook(webhookURL)
+	}
+	if err != nil {
+		log.Error("failed to build webhook config", "err", err)
+		panic(err)
+	}
+
+	_, err = b.api.Request(wh)
 	if err != nil {
 		log.Error("failed to set webhook", "err", err)
 		panic(err)
 	}
 
 	updates := b.api.ListenForWebhook("/")
-	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+
+	go func() {
+		addr := fmt.Sprintf(":%d", port)
+		if tlsCertPath != "" && tlsKeyPath != "" {
+			log.Info("starting HTTPS webhook listener", "addr", addr)
+			if err := http.ListenAndServeTLS(addr, tlsCertPath, tlsKeyPath, nil); err != nil {
+				log.Error("webhook HTTPS server stopped", "err", err)
+				panic(err)
+			}
+			return
+		}
+
+		log.Info("starting HTTP webhook listener", "addr", addr)
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			log.Error("webhook HTTP server stopped", "err", err)
+			panic(err)
+		}
+	}()
 
 	for update := range updates {
 		log.Info("<- incoming update", "id", update.UpdateID)

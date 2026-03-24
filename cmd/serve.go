@@ -94,7 +94,13 @@ func Serve() {
 	)
 
 	if cnf.Telegram.WebhookURL != "" {
-		b.StartWebhook(cnf.Telegram.WebhookURL, cnf.Telegram.ListenPort)
+		b.StartWebhook(
+			cnf.Telegram.WebhookURL,
+			cnf.Telegram.ListenPort,
+			cnf.Telegram.TLSCertPath,
+			cnf.Telegram.TLSKeyPath,
+			cnf.Telegram.WebhookCertPath,
+		)
 	} else {
 		b.Start()
 	}
