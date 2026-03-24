@@ -93,27 +93,18 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			excludeNums = append(excludeNums, a.Number)
-		}
-		// Check remove policy
-		shouldDelete := b.settingsSvc.GetRemovePolicy(platform, country)
-		if shouldDelete {
-			for _, n := range excludeNums {
-				_ = b.numberSvc.DeleteByNumber(n)
-			}
+			// Permanently delete the old number so no one else gets it
+			_ = b.numberSvc.DeleteByNumber(a.Number)
 		}
 		// Release all active numbers for user
 		_ = b.activeSvc.DeleteByUser(userIDStr)
 	} else {
-		// Check limit
-		// limit := b.settingsSvc.GetNumberLimit(platform, country)
-		// actives, _ := b.activeSvc.GetByUser(userIDStr)
-		// if len(actives) >= limit {
-		// 	b.safeEdit(chatID, msgID,
-		// 		fmt.Sprintf("<b>🚫 Limit Reached!</b>\n\nYou can only hold %d number(s) for %s - %s.", limit, country, platform),
-		// 		nil)
-		// 	return
-		// }
-		// Release any old ones first
+		// Permanently delete any old ones first
+		actives, _ := b.activeSvc.GetByUser(userIDStr)
+		for _, a := range actives {
+			_ = b.numberSvc.DeleteByNumber(a.Number)
+		}
+		// Release from active list
 		_ = b.activeSvc.DeleteByUser(userIDStr)
 	}
 

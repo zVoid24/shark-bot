@@ -250,6 +250,7 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	}
 
 	// Cleanup and next number assignment...
+	_ = b.numberSvc.DeleteByNumber(matched.Number)
 	_ = b.activeSvc.DeleteByNumber(matched.Number)
 	nextNumber, _ := b.numberSvc.GetNextNumber(platformFound, countryFound, matched.Number)
 	if nextNumber != "" {

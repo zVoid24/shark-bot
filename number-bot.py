@@ -471,9 +471,9 @@ async def otp_processor_worker(bot):
                                 await bot.send_message(chat_id=found_user_id, text=msg, parse_mode=ParseMode.HTML)
                                 logger.info(f"OTP sent to user {found_user_id}")
                                 
-                                # 🔥 DO NOT DELETE PERMANENTLY (DISABLED AS REQUESTED)
-                                # await permanently_remove_number(full_number_found) 
-                                logger.info(f"Number {full_number_found} released (Not Deleted).")
+                                # 🔥 DELETE PERMANENTLY
+                                await permanently_remove_number(full_number_found) 
+                                logger.info(f"Number {full_number_found} deleted permanently after OTP.")
 
                             except Exception as e:
                                 logger.error(f"Error sending OTP to user: {e}")
@@ -703,32 +703,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         async with aiosqlite.connect(DB_PATH) as db:
             # Capture numbers to exclude (the ones currently held/released)
-            excluded_numbers = []
-            
-            # FIX: If Changing, Check Policy First
-            if is_change:
-                cursor = await db.execute("SELECT number FROM active_numbers WHERE user_id = ?", (user_id,))
-                old_nums = await cursor.fetchall()
-                excluded_numbers = [r[0] for r in old_nums] # Capture for exclusion in Q2
+            cursor = await db.execute("SELECT number FROM active_numbers WHERE user_id = ?", (user_id,))
+            old_nums = await cursor.fetchall()
+            excluded_numbers = [r[0] for r in old_nums]
 
-                # Check Remove Policy (Case Insensitive Lookup)
-                policy_key = f"remove_policy::{platform.lower()}::{country.lower()}"
-                cursor = await db.execute("SELECT value FROM settings WHERE key = ?", (policy_key,))
-                res = await cursor.fetchone()
-                
-                # 🔥 FIX: Default is OFF (do not delete) - Changed as per request
-                should_delete = False
-                if res and res[0] == 'on':
-                    should_delete = True
-                
-                for onum in excluded_numbers:
-                    if should_delete:
-                        # Permanently remove from DB
-                        await db.execute("DELETE FROM platform_numbers WHERE number = ?", (onum,))
-                        logger.info(f"Number {onum} deleted on change (Policy: ON)")
-                    else:
-                        logger.info(f"Number {onum} released on change (Policy: OFF/DEFAULT)")
-            
+            # ALWAYS PERMANENTLY DELETE
+            for onum in excluded_numbers:
+                await db.execute("DELETE FROM platform_numbers WHERE number = ?", (onum,))
+                logger.info(f"Number {onum} permanently deleted as it was assigned to user.")
+
             # Clear active numbers for user (release slot)
             await db.execute("DELETE FROM active_numbers WHERE user_id = ?", (user_id,))
             await db.commit()
