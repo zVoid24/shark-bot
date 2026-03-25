@@ -147,6 +147,9 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 				fmt.Sprintf("change_number::%s::%s", platform, country)),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("📢 OTP Group", "https://t.me/shark_sms_panel"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Back",
 				fmt.Sprintf("back_to_countries::%s", platform)),
 		),
