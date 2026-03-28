@@ -27,6 +27,8 @@ go.work.sum
 # env file
 .env
 
+data/known_users.txt
+
 # Editor/IDE
 # .idea/
 # .vscode/
