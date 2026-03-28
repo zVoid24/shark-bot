@@ -25,6 +25,8 @@ type TelegramConfig struct {
 	EnableWebhook bool
 	WebhookURL    string
 	ListenPort    int
+	VerifyGroup1  string // First group to verify membership
+	VerifyGroup2  string // Second group to verify membership
 }
 
 type AppConfig struct {
@@ -157,6 +159,8 @@ func Load() *Config {
 		EnableWebhook: getBoolDefault("ENABLE_WEBHOOK", false),
 		WebhookURL:    os.Getenv("WEBHOOK_URL"),
 		ListenPort:    listenPort,
+		VerifyGroup1:  getDefault("VERIFY_GROUP_1", ""),
+		VerifyGroup2:  getDefault("VERIFY_GROUP_2", ""),
 	}
 
 	// --- Scraper ---

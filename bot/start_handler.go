@@ -9,7 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// handleStart registers user and sends welcome message
+// handleStart registers user and shows verification screen
 func (b *Bot) handleStart(msg *tgbotapi.Message) {
 	user := msg.From
 	if user == nil {
@@ -53,6 +53,14 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 		}
 	}
 
+	// Check if user is verified (joined both groups)
+	if !b.isUserVerified(user.ID) {
+		// Show verification screen
+		b.showVerificationScreen(msg.Chat.ID)
+		return
+	}
+
+	// User is verified, show welcome message
 	welcome := fmt.Sprintf(
 		"<b>Hi %s!</b>\n\n<b>You can get a phone number by clicking the \"Get a Phone Number ☎️\" button below.</b>",
 		fullName)

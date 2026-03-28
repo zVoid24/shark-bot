@@ -91,6 +91,8 @@ func Serve() {
 		scrp,
 		cnf.Telegram.OwnerIDs,
 		cnf.Telegram.CooldownSecs,
+		cnf.Telegram.VerifyGroup1,
+		cnf.Telegram.VerifyGroup2,
 	)
 
 	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {

@@ -23,7 +23,18 @@ func (b *Bot) handleCallback(cb *tgbotapi.CallbackQuery) {
 		return
 	}
 
+	// Check verification status
+	verified := b.isUserVerified(cb.From.ID)
+
 	switch {
+	case data == "verify_check":
+		b.handleVerificationCheck(cb)
+
+	case !verified:
+		// If not verified and trying to use features, show verification screen
+		b.answerCallback(cb.ID, "You must verify membership first.", true)
+		b.showVerificationScreen(chatID)
+
 	case data == "back_to_platforms":
 		b.showPlatformList(chatID, msgID, true)
 

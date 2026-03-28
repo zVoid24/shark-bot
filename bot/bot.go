@@ -35,6 +35,8 @@ type Bot struct {
 	scraper      *Scraper
 	ownerIDs     []string
 	cooldownSecs int
+	verifyGroup1 string // First group URL to verify membership
+	verifyGroup2 string // Second group URL to verify membership
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
@@ -55,6 +57,8 @@ func New(
 	scraper *Scraper,
 	ownerIDs []string,
 	cooldownSecs int,
+	verifyGroup1 string,
+	verifyGroup2 string,
 ) *Bot {
 	return &Bot{
 		api:          api,
@@ -69,6 +73,8 @@ func New(
 		scraper:      scraper,
 		ownerIDs:     ownerIDs,
 		cooldownSecs: cooldownSecs,
+		verifyGroup1: verifyGroup1,
+		verifyGroup2: verifyGroup2,
 		convState:    make(map[int64]*convContext),
 	}
 }
@@ -154,7 +160,18 @@ func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
 	}
 
 	if msg.IsCommand() {
+		// Commands are always allowed (they'll check verification themselves)
 		b.handleCommand(msg)
+		return
+	}
+
+	// Check if user is verified for non-command messages
+	userID := fmt.Sprintf("%d", msg.From.ID)
+	isAdmin, _ := b.adminSvc.IsAdmin(userID)
+
+	if !isAdmin && !b.isUserVerified(msg.From.ID) {
+		// Non-admin users must be verified
+		b.sendHTML(msg.Chat.ID, "❌ You must complete verification first. Use /start to begin.")
 		return
 	}
 
