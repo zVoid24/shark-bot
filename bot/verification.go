@@ -12,10 +12,10 @@ import (
 func (b *Bot) verificationKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("📱 Join Group 1", b.verifyGroup1),
+			tgbotapi.NewInlineKeyboardButtonURL("📱 Join Group 1", b.verifyURL1),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("⛧ Join Group 2", b.verifyGroup2),
+			tgbotapi.NewInlineKeyboardButtonURL("⛧ Join Group 2", b.verifyURL2),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Check Verification", "verify_check"),
@@ -29,8 +29,8 @@ func (b *Bot) showVerificationScreen(chatID int64) {
 
 Before you can use this bot, you must join both of our groups:
 
-<b>📱 Group 1:</b> SHARK SMS BACKUP
-<b>⛧ Group 2:</b> SHARK METHOD
+<b>📱 Group 1:</b> 𝗦𝗛𝗔𝗥𝗞 𝗦𝗠𝗦 𝗕𝗔𝗖𝗞𝗨𝗣
+<b>⛧ Group 2:</b> 𝙎𝙃𝘼𝙍𝙆 𝙈𝙀𝙏𝙃𝙊𝘿 ⛧
 
 Join both groups using the buttons below, then click "Check Verification" to verify your membership.`
 
@@ -38,7 +38,6 @@ Join both groups using the buttons below, then click "Check Verification" to ver
 }
 
 // isUserVerified checks if a user has joined both required groups
-// Note: For this to work, the bot must be an admin in both groups with permission to check members
 func (b *Bot) isUserVerified(userID int64) bool {
 	// Check membership in first group
 	if !b.checkGroupMembership(userID, b.verifyGroup1) {
@@ -54,39 +53,33 @@ func (b *Bot) isUserVerified(userID int64) bool {
 }
 
 // checkGroupMembership checks if a user is a member of a group/channel
-// The group can be identified by URL (e.g., "https://t.me/SHARK_EMPIRE_1") or username/ID
 func (b *Bot) checkGroupMembership(userID int64, groupIdentifier string) bool {
-	if groupIdentifier == "" {
-		// If group identifier is not set, skip verification
+	if groupIdentifier == "" || groupIdentifier == "0" {
 		return true
 	}
 
-	// Extract username/ID from URL if it's a full URL
 	identifier := groupIdentifier
-	if strings.Contains(identifier, "t.me/") {
-		// Extract the part after "t.me/"
-		parts := strings.Split(identifier, "t.me/")
-		if len(parts) > 1 {
-			identifier = parts[1]
-		}
-	}
 
-	// Remove any trailing slashes
-	identifier = strings.TrimSuffix(identifier, "/")
-
-	// Try to get user's chat member status
+	// Parse numeric ID or username
 	var chatID int64
+	var username string
 
-	// Try with username first (for channels/groups)
 	if strings.HasPrefix(identifier, "@") {
-		chatID = 0
+		username = identifier
 	} else if strings.HasPrefix(identifier, "-") {
-		// It's a negative number (group ID)
+		// Numeric ID
 		fmt.Sscanf(identifier, "%d", &chatID)
+		// Ensure -100 prefix for supergroups if not present
+		if chatID > -1000000000000 && chatID < 0 {
+			s := identifier
+			if !strings.HasPrefix(s, "-100") {
+				s = "-100" + strings.TrimPrefix(s, "-")
+				fmt.Sscanf(s, "%d", &chatID)
+			}
+		}
 	} else {
-		// Assume it's a username without @
-		identifier = "@" + identifier
-		chatID = 0
+		// Default to username
+		username = "@" + identifier
 	}
 
 	cfg := tgbotapi.GetChatMemberConfig{
@@ -96,17 +89,27 @@ func (b *Bot) checkGroupMembership(userID int64, groupIdentifier string) bool {
 		},
 	}
 	if chatID == 0 {
-		cfg.SuperGroupUsername = identifier
+		cfg.SuperGroupUsername = username
 	}
 
 	member, err := b.api.GetChatMember(cfg)
 	if err != nil {
-		logger.L.Error("Failed to check group membership", "user_id", userID, "group", identifier, "err", err)
+		logger.L.Error("Failed to check group membership",
+			"user_id", userID,
+			"group", identifier,
+			"resolved_id", chatID,
+			"resolved_user", username,
+			"err", err)
 		return false
 	}
 
-	// Check if user is a member (not left or kicked)
 	status := member.Status
+	logger.L.Debug("Membership status checked",
+		"user_id", userID,
+		"group", identifier,
+		"status", status)
+
+	// Valid statuses for being a "member"
 	return status == "member" || status == "administrator" || status == "creator" || status == "restricted"
 }
 
@@ -117,8 +120,8 @@ func (b *Bot) handleVerificationCheck(cb *tgbotapi.CallbackQuery) {
 	msgID := cb.Message.MessageID
 
 	if b.isUserVerified(userID) {
-		// User is verified, show success and proceed to normal flow
-		b.answerCallback(cb.ID, "✅ Verification successful!", false)
+		// Show success pop-up alert
+		b.answerCallback(cb.ID, "✅ Verification successful!", true)
 
 		// Edit message to show verification successful
 		successMsg := `<b>✅ Verification Successful!</b>
@@ -131,11 +134,9 @@ You can get a phone number by clicking the "Get a Phone Number ☎️" button.`
 
 		// Send main keyboard
 		b.sendWithReplyKeyboard(chatID, "What would you like to do?", mainKeyboard())
-
-		// Mark user as verified (optional: store in database if needed)
 		return
 	}
 
-	// User is not verified
+	// User is not verified - show an alert pop-up (showAlert=true)
 	b.answerCallback(cb.ID, "❌ You have not joined both groups yet. Please join them first.", true)
 }

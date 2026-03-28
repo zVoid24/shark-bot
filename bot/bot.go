@@ -36,8 +36,10 @@ type Bot struct {
 	scraper      *Scraper
 	ownerIDs     []string
 	cooldownSecs int
-	verifyGroup1 string // First group URL to verify membership
-	verifyGroup2 string // Second group URL to verify membership
+	verifyGroup1 string // First group URL/ID to verify membership
+	verifyGroup2 string // Second group URL/ID to verify membership
+	verifyURL1   string // First group join redirection URL
+	verifyURL2   string // Second group join redirection URL
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
@@ -60,6 +62,8 @@ func New(
 	cooldownSecs int,
 	verifyGroup1 string,
 	verifyGroup2 string,
+	verifyURL1 string,
+	verifyURL2 string,
 ) *Bot {
 	return &Bot{
 		api:          api,
@@ -74,8 +78,10 @@ func New(
 		scraper:      scraper,
 		ownerIDs:     ownerIDs,
 		cooldownSecs: cooldownSecs,
-		verifyGroup1: verifyGroup1,
-		verifyGroup2: verifyGroup2,
+		verifyGroup1:  verifyGroup1,
+		verifyGroup2:  verifyGroup2,
+		verifyURL1:    verifyURL1,
+		verifyURL2:    verifyURL2,
 		convState:    make(map[int64]*convContext),
 	}
 }
@@ -148,6 +154,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 // handlePrivateMessage routes private messages to the correct handler.
 func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
 	b.trackKnownUser(msg.From)
+	userID := fmt.Sprintf("%d", msg.From.ID)
 
 	if msg.Text != "" && msg.Document == nil {
 		if b.handleConversationText(msg) {
@@ -161,18 +168,29 @@ func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
 	}
 
 	if msg.IsCommand() {
-		// Commands are always allowed (they'll check verification themselves)
+		cmd := msg.Command()
+		if cmd == "start" {
+			b.handleStart(msg)
+			return
+		}
+
+		// Check if admin or verified
+		isAdmin, _ := b.adminSvc.IsAdmin(userID)
+		if !isAdmin && !b.isUserVerified(msg.From.ID) {
+			b.showVerificationScreen(msg.Chat.ID)
+			return
+		}
+
 		b.handleCommand(msg)
 		return
 	}
 
 	// Check if user is verified for non-command messages
-	userID := fmt.Sprintf("%d", msg.From.ID)
 	isAdmin, _ := b.adminSvc.IsAdmin(userID)
 
 	if !isAdmin && !b.isUserVerified(msg.From.ID) {
 		// Non-admin users must be verified
-		b.sendHTML(msg.Chat.ID, "❌ You must complete verification first. Use /start to begin.")
+		b.showVerificationScreen(msg.Chat.ID)
 		return
 	}
 

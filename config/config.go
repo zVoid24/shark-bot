@@ -27,6 +27,8 @@ type TelegramConfig struct {
 	ListenPort    int
 	VerifyGroup1  string // First group to verify membership
 	VerifyGroup2  string // Second group to verify membership
+	VerifyURL1    string // First group join URL
+	VerifyURL2    string // Second group join URL
 }
 
 type AppConfig struct {
@@ -161,6 +163,8 @@ func Load() *Config {
 		ListenPort:    listenPort,
 		VerifyGroup1:  getDefault("VERIFY_GROUP_1", ""),
 		VerifyGroup2:  getDefault("VERIFY_GROUP_2", ""),
+		VerifyURL1:    getDefault("VERIFY_URL_1", ""),
+		VerifyURL2:    getDefault("VERIFY_URL_2", ""),
 	}
 
 	// --- Scraper ---
