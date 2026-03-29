@@ -194,16 +194,23 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	var err error
 
 	if b.activeCache != nil {
+		logger.L.Debug("otp redis lookup start", "incoming_number", fullNumber)
 		matched, err = b.activeCache.GetByNumber(ctx, fullNumber)
 		if err != nil {
 			logger.L.Error("redis active-number lookup failed", "number", fullNumber, "err", err)
 			matched = nil
+		} else if matched != nil {
+			logger.L.Info("otp matched via redis", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
+		} else {
+			logger.L.Debug("otp redis miss", "incoming_number", fullNumber)
 		}
 	}
 
 	if matched == nil {
+		logger.L.Debug("otp db fallback lookup start", "incoming_number", fullNumber)
 		allActive, getErr := b.activeSvc.GetAll()
 		if getErr != nil {
+			logger.L.Error("failed to load active numbers for db fallback", "incoming_number", fullNumber, "err", getErr)
 			return
 		}
 
@@ -218,13 +225,17 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 		}
 
 		if matched != nil && b.activeCache != nil {
+			logger.L.Info("otp matched via db fallback", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
 			if setErr := b.activeCache.Set(ctx, *matched); setErr != nil {
 				logger.L.Warn("failed to backfill active-number cache", "number", matched.Number, "user_id", matched.UserID, "err", setErr)
+			} else {
+				logger.L.Debug("backfilled active-number cache", "number", matched.Number, "user_id", matched.UserID)
 			}
 		}
 	}
 
 	if matched == nil {
+		logger.L.Info("otp no active match", "incoming_number", fullNumber, "service", service, "otp", otp)
 		return
 	}
 
@@ -265,16 +276,37 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 				},
 			},
 		}
-		_, _ = b.api.Send(otpMsg)
+		if _, sendErr := b.api.Send(otpMsg); sendErr != nil {
+			logger.L.Error("failed to send otp to user", "user_id", foundUserID, "chat_id", userChatID, "incoming_number", fullNumber, "matched_number", matched.Number, "otp", otp, "service", service, "err", sendErr)
+		} else {
+			logger.L.Info("otp sent to user", "user_id", foundUserID, "chat_id", userChatID, "incoming_number", fullNumber, "matched_number", matched.Number, "otp", otp, "service", service)
+		}
+	} else {
+		logger.L.Error("invalid matched user id for otp delivery", "user_id", foundUserID, "incoming_number", fullNumber, "matched_number", matched.Number)
 	}
 
 	// Cleanup and next number assignment...
-	_ = b.numberSvc.DeleteByNumber(matched.Number)
-	_ = b.activeSvc.DeleteByNumber(matched.Number)
-	if b.activeCache != nil {
-		_ = b.activeCache.DeleteByNumber(ctx, matched.Number)
+	if err := b.numberSvc.DeleteByNumber(matched.Number); err != nil {
+		logger.L.Error("failed to delete matched number from pool", "number", matched.Number, "user_id", foundUserID, "err", err)
+	} else {
+		logger.L.Debug("deleted matched number from pool", "number", matched.Number, "user_id", foundUserID)
 	}
-	nextNumber, _ := b.numberSvc.GetNextNumber(platformFound, countryFound, matched.Number)
+	if err := b.activeSvc.DeleteByNumber(matched.Number); err != nil {
+		logger.L.Error("failed to delete matched active number", "number", matched.Number, "user_id", foundUserID, "err", err)
+	} else {
+		logger.L.Debug("deleted matched active number", "number", matched.Number, "user_id", foundUserID)
+	}
+	if b.activeCache != nil {
+		if err := b.activeCache.DeleteByNumber(ctx, matched.Number); err != nil {
+			logger.L.Error("failed to delete matched number from redis cache", "number", matched.Number, "user_id", foundUserID, "err", err)
+		} else {
+			logger.L.Debug("deleted matched number from redis cache", "number", matched.Number, "user_id", foundUserID)
+		}
+	}
+	nextNumber, nextErr := b.numberSvc.GetNextNumber(platformFound, countryFound, matched.Number)
+	if nextErr != nil {
+		logger.L.Error("failed to assign next number", "user_id", foundUserID, "platform", platformFound, "country", countryFound, "err", nextErr)
+	}
 	if nextNumber != "" {
 		nextAN := activenumber.ActiveNumber{
 			Number:    nextNumber,
@@ -284,9 +316,19 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 			Platform:  platformFound,
 			Country:   countryFound,
 		}
-		_ = b.activeSvc.Insert(nextAN)
-		if b.activeCache != nil {
-			_ = b.activeCache.Set(ctx, nextAN)
+		if err := b.activeSvc.Insert(nextAN); err != nil {
+			logger.L.Error("failed to insert next active number", "number", nextNumber, "user_id", foundUserID, "platform", platformFound, "country", countryFound, "err", err)
+		} else {
+			logger.L.Info("next active number assigned", "number", nextNumber, "user_id", foundUserID, "platform", platformFound, "country", countryFound)
 		}
+		if b.activeCache != nil {
+			if err := b.activeCache.Set(ctx, nextAN); err != nil {
+				logger.L.Error("failed to cache next active number", "number", nextNumber, "user_id", foundUserID, "err", err)
+			} else {
+				logger.L.Debug("cached next active number", "number", nextNumber, "user_id", foundUserID)
+			}
+		}
+	} else {
+		logger.L.Info("no next number available after otp", "user_id", foundUserID, "platform", platformFound, "country", countryFound)
 	}
 }
