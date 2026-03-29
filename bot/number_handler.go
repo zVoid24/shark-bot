@@ -138,7 +138,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		numDisplay += fmt.Sprintf("<code>%s</code>\n", n)
 	}
 
-	text := fmt.Sprintf("<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"https://t.me/zvoidois\"><i>𝑍𝐴𝐻𝐼𝐷</i></a>",
+	text := fmt.Sprintf("<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"tg://resolve?domain=zvoidois\"><i>𝑍𝐴𝐻𝐼𝐷</i></a>",
 		country, platform, numDisplay)
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(

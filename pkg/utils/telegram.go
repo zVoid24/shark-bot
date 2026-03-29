@@ -21,6 +21,7 @@ func SendHTML(api *tgbotapi.BotAPI, chatID int64, text string) {
 func SendHTMLWithMarkup(api *tgbotapi.BotAPI, chatID int64, text string, markup tgbotapi.InlineKeyboardMarkup) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeHTML
+	msg.DisableWebPagePreview = true
 	msg.ReplyMarkup = markup
 	if _, err := api.Send(msg); err != nil {
 		log.Error("failed to send message with markup", "chat_id", chatID, "err", err)

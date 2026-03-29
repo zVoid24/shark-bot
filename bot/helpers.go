@@ -12,6 +12,7 @@ var botLog = logger.New("bot")
 func (b *Bot) sendHTML(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeHTML
+	msg.DisableWebPagePreview = true
 	if _, err := b.api.Send(msg); err != nil {
 		botLog.Error("sendHTML failed", "chat_id", chatID, "err", err)
 	}
@@ -21,6 +22,7 @@ func (b *Bot) sendHTML(chatID int64, text string) {
 func (b *Bot) sendHTMLWithMarkup(chatID int64, text string, markup tgbotapi.InlineKeyboardMarkup) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeHTML
+	msg.DisableWebPagePreview = true
 	msg.ReplyMarkup = markup
 	if _, err := b.api.Send(msg); err != nil {
 		botLog.Error("sendHTMLWithMarkup failed", "chat_id", chatID, "err", err)
@@ -51,6 +53,7 @@ func (b *Bot) removeKeyboard(chatID int64, text string) {
 func (b *Bot) safeEdit(chatID int64, messageID int, text string, markup *tgbotapi.InlineKeyboardMarkup) {
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	edit.ParseMode = tgbotapi.ModeHTML
+	edit.DisableWebPagePreview = true
 	if markup != nil {
 		edit.ReplyMarkup = markup
 	}
