@@ -2,6 +2,7 @@ package bot
 
 //testing ci/cd pipeline
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"shark_bot/internal/activenumber"
@@ -15,12 +16,13 @@ import (
 	"shark_bot/pkg/logger"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 var log = logger.New("bot")
 
 // Temporary switch: keep scraper code intact but do not run the background worker.
-const otpWorkerEnabled = false
+const otpWorkerEnabled = true
 
 // Bot aggregates all dependencies via domain service interfaces.
 type Bot struct {
@@ -34,6 +36,8 @@ type Bot struct {
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
 	scraper      *Scraper
+	redisClient  *redis.Client
+	activeCache  *ActiveNumberCache
 	ownerIDs     []string
 	cooldownSecs int
 	verifyGroup1 string // First group URL/ID to verify membership
@@ -58,6 +62,8 @@ func New(
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
 	scraper *Scraper,
+	redisClient *redis.Client,
+	activeCache *ActiveNumberCache,
 	ownerIDs []string,
 	cooldownSecs int,
 	verifyGroup1 string,
@@ -76,6 +82,8 @@ func New(
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
 		scraper:      scraper,
+		redisClient:  redisClient,
+		activeCache:  activeCache,
 		ownerIDs:     ownerIDs,
 		cooldownSecs: cooldownSecs,
 		verifyGroup1:  verifyGroup1,
@@ -97,6 +105,7 @@ func (b *Bot) Start() {
 	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
 
 	if otpWorkerEnabled {
+		b.seedActiveCacheFromDB()
 		go b.otpWorker()
 	} else {
 		log.Info("OTP worker disabled")
@@ -117,6 +126,7 @@ func (b *Bot) StartWebhook(webhookURL string, port int) {
 	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
 
 	if otpWorkerEnabled {
+		b.seedActiveCacheFromDB()
 		go b.otpWorker()
 	} else {
 		log.Info("OTP worker disabled")
@@ -135,6 +145,23 @@ func (b *Bot) StartWebhook(webhookURL string, port int) {
 	for update := range updates {
 		log.Info("<- incoming update", "id", update.UpdateID)
 		go b.handleUpdate(update)
+	}
+}
+
+func (b *Bot) seedActiveCacheFromDB() {
+	if b.activeCache == nil {
+		return
+	}
+	all, err := b.activeSvc.GetAll()
+	if err != nil {
+		log.Warn("failed to load active numbers for redis seed", "err", err)
+		return
+	}
+	ctx := context.Background()
+	for _, an := range all {
+		if err := b.activeCache.Set(ctx, an); err != nil {
+			log.Warn("failed to seed active number in redis", "number", an.Number, "user_id", an.UserID, "err", err)
+		}
 	}
 }
 

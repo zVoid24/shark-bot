@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"shark_bot/pkg/logger"
 	"strings"
@@ -212,6 +213,13 @@ func (b *Bot) handleStatusAll(msg *tgbotapi.Message) {
 func (b *Bot) handleResetAll(msg *tgbotapi.Message) {
 	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
 		return
+	}
+	if b.activeCache != nil {
+		acts, _ := b.activeSvc.GetAll()
+		ctx := context.Background()
+		for _, an := range acts {
+			_ = b.activeCache.DeleteByNumber(ctx, an.Number)
+		}
 	}
 	_ = b.activeSvc.DeleteAll()
 	_ = b.statsSvc.ResetAll()

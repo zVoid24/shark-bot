@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"shark_bot/pkg/logger"
 	"time"
@@ -95,17 +96,29 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 			excludeNums = append(excludeNums, a.Number)
 			// Permanently delete the old number so no one else gets it
 			_ = b.numberSvc.DeleteByNumber(a.Number)
+			if b.activeCache != nil {
+				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
+			}
 		}
 		// Release all active numbers for user
 		_ = b.activeSvc.DeleteByUser(userIDStr)
+		if b.activeCache != nil {
+			_ = b.activeCache.DeleteByUser(context.Background(), userIDStr)
+		}
 	} else {
 		// Permanently delete any old ones first
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			_ = b.numberSvc.DeleteByNumber(a.Number)
+			if b.activeCache != nil {
+				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
+			}
 		}
 		// Release from active list
 		_ = b.activeSvc.DeleteByUser(userIDStr)
+		if b.activeCache != nil {
+			_ = b.activeCache.DeleteByUser(context.Background(), userIDStr)
+		}
 	}
 
 	// limit := b.settingsSvc.GetNumberLimit(platform, country)
@@ -127,6 +140,9 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 			Country:   country,
 		}
 		_ = b.activeSvc.Insert(an)
+		if b.activeCache != nil {
+			_ = b.activeCache.Set(context.Background(), an)
+		}
 		_ = b.seenSvc.Add(userIDStr, num, country)
 	}
 

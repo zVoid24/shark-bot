@@ -43,11 +43,21 @@ type ScraperConfig struct {
 	Password string
 }
 
+type RedisConfig struct {
+	Addr       string
+	Password   string
+	DB         int
+	KeyPrefix  string
+	ActiveTTL  int
+	EnableTLS  bool
+}
+
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Telegram TelegramConfig
 	Scraper  ScraperConfig
+	Redis    RedisConfig
 }
 
 var cfg *Config
@@ -175,11 +185,22 @@ func Load() *Config {
 		Password: os.Getenv("SCRAPER_PASSWORD"),
 	}
 
+	// --- Redis ---
+	redis := RedisConfig{
+		Addr:      getDefault("REDIS_ADDR", "127.0.0.1:6379"),
+		Password:  getDefault("REDIS_PASSWORD", ""),
+		DB:        func() int { v, _ := strconv.Atoi(getDefault("REDIS_DB", "0")); return v }(),
+		KeyPrefix: getDefault("REDIS_KEY_PREFIX", "sharkbot"),
+		ActiveTTL: func() int { v, _ := strconv.Atoi(getDefault("REDIS_ACTIVE_TTL_SECONDS", "7200")); return v }(),
+		EnableTLS: getBoolDefault("REDIS_ENABLE_TLS", false),
+	}
+
 	cfg = &Config{
 		App:      app,
 		Database: dbCfg,
 		Telegram: tg,
 		Scraper:  scraper,
+		Redis:    redis,
 	}
 
 	return cfg

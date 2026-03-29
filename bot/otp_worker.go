@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"shark_bot/pkg/logger"
@@ -188,20 +189,38 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	// But we have the full number now! (usually)
 	// If res.Number is full, we can match exactly.
 
-	allActive, err := b.activeSvc.GetAll()
-	if err != nil {
-		return
+	ctx := context.Background()
+	var matched *activenumber.ActiveNumber
+	var err error
+
+	if b.activeCache != nil {
+		matched, err = b.activeCache.GetByNumber(ctx, fullNumber)
+		if err != nil {
+			logger.L.Error("redis active-number lookup failed", "number", fullNumber, "err", err)
+			matched = nil
+		}
 	}
 
-	var matched *activenumber.ActiveNumber
-	cleanFull := onlyDigits.ReplaceAllString(fullNumber, "")
+	if matched == nil {
+		allActive, getErr := b.activeSvc.GetAll()
+		if getErr != nil {
+			return
+		}
 
-	for _, an := range allActive {
-		cleanActive := onlyDigits.ReplaceAllString(an.Number, "")
-		if cleanActive == cleanFull || strings.HasSuffix(cleanFull, cleanActive) || strings.HasSuffix(cleanActive, cleanFull) {
-			cp := an
-			matched = &cp
-			break
+		cleanFull := onlyDigits.ReplaceAllString(fullNumber, "")
+		for _, an := range allActive {
+			cleanActive := onlyDigits.ReplaceAllString(an.Number, "")
+			if cleanActive == cleanFull || strings.HasSuffix(cleanFull, cleanActive) || strings.HasSuffix(cleanActive, cleanFull) {
+				cp := an
+				matched = &cp
+				break
+			}
+		}
+
+		if matched != nil && b.activeCache != nil {
+			if setErr := b.activeCache.Set(ctx, *matched); setErr != nil {
+				logger.L.Warn("failed to backfill active-number cache", "number", matched.Number, "user_id", matched.UserID, "err", setErr)
+			}
 		}
 	}
 
@@ -252,6 +271,9 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	// Cleanup and next number assignment...
 	_ = b.numberSvc.DeleteByNumber(matched.Number)
 	_ = b.activeSvc.DeleteByNumber(matched.Number)
+	if b.activeCache != nil {
+		_ = b.activeCache.DeleteByNumber(ctx, matched.Number)
+	}
 	nextNumber, _ := b.numberSvc.GetNextNumber(platformFound, countryFound, matched.Number)
 	if nextNumber != "" {
 		nextAN := activenumber.ActiveNumber{
@@ -263,5 +285,8 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 			Country:   countryFound,
 		}
 		_ = b.activeSvc.Insert(nextAN)
+		if b.activeCache != nil {
+			_ = b.activeCache.Set(ctx, nextAN)
+		}
 	}
 }

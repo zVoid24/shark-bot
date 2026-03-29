@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"crypto/tls"
 	"shark_bot/infra/db"
 	"shark_bot/infra/repository"
 	"shark_bot/internal/activenumber"
@@ -15,8 +17,10 @@ import (
 
 	"shark_bot/bot"
 	"shark_bot/config"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 func Serve() {
@@ -59,6 +63,30 @@ func Serve() {
 	seenSvc := seennumber.NewService(seenRepo)
 	processedSvc := processednumber.NewService(processedRepo)
 
+	// 5.2 Initialize Redis and active-number cache (optional fallback to DB if unavailable)
+	var redisClient *redis.Client
+	var activeCache *bot.ActiveNumberCache
+	redisOpts := &redis.Options{
+		Addr:     cnf.Redis.Addr,
+		Password: cnf.Redis.Password,
+		DB:       cnf.Redis.DB,
+	}
+	if cnf.Redis.EnableTLS {
+		redisOpts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	redisClient = redis.NewClient(redisOpts)
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		log.Warn("redis unavailable; continuing with DB-only fallback", "addr", cnf.Redis.Addr, "err", err)
+		redisClient = nil
+	} else {
+		activeCache = bot.NewActiveNumberCache(
+			redisClient,
+			cnf.Redis.KeyPrefix,
+			time.Duration(cnf.Redis.ActiveTTL)*time.Second,
+		)
+		log.Info("redis connected", "addr", cnf.Redis.Addr)
+	}
+
 	// 5.5 Initialize Scraper
 	scrp, err := bot.NewScraper(cnf.Scraper.LoginURL, cnf.Scraper.SMSURL, cnf.Scraper.Username, cnf.Scraper.Password)
 	if err != nil {
@@ -89,6 +117,8 @@ func Serve() {
 		seenSvc,
 		processedSvc,
 		scrp,
+		redisClient,
+		activeCache,
 		cnf.Telegram.OwnerIDs,
 		cnf.Telegram.CooldownSecs,
 		cnf.Telegram.VerifyGroup1,
