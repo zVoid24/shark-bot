@@ -285,7 +285,7 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 		logger.L.Error("invalid matched user id for otp delivery", "user_id", foundUserID, "incoming_number", fullNumber, "matched_number", matched.Number)
 	}
 
-	// Cleanup and next number assignment...
+	// Cleanup only. Reassignment is user-driven via the "Change Number" button.
 	if err := b.numberSvc.DeleteByNumber(matched.Number); err != nil {
 		logger.L.Error("failed to delete matched number from pool", "number", matched.Number, "user_id", foundUserID, "err", err)
 	} else {
@@ -303,32 +303,5 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 			logger.L.Debug("deleted matched number from redis cache", "number", matched.Number, "user_id", foundUserID)
 		}
 	}
-	nextNumber, nextErr := b.numberSvc.GetNextNumber(platformFound, countryFound, matched.Number)
-	if nextErr != nil {
-		logger.L.Error("failed to assign next number", "user_id", foundUserID, "platform", platformFound, "country", countryFound, "err", nextErr)
-	}
-	if nextNumber != "" {
-		nextAN := activenumber.ActiveNumber{
-			Number:    nextNumber,
-			UserID:    foundUserID,
-			Timestamp: time.Now(),
-			MessageID: menuMessageID,
-			Platform:  platformFound,
-			Country:   countryFound,
-		}
-		if err := b.activeSvc.Insert(nextAN); err != nil {
-			logger.L.Error("failed to insert next active number", "number", nextNumber, "user_id", foundUserID, "platform", platformFound, "country", countryFound, "err", err)
-		} else {
-			logger.L.Info("next active number assigned", "number", nextNumber, "user_id", foundUserID, "platform", platformFound, "country", countryFound)
-		}
-		if b.activeCache != nil {
-			if err := b.activeCache.Set(ctx, nextAN); err != nil {
-				logger.L.Error("failed to cache next active number", "number", nextNumber, "user_id", foundUserID, "err", err)
-			} else {
-				logger.L.Debug("cached next active number", "number", nextNumber, "user_id", foundUserID)
-			}
-		}
-	} else {
-		logger.L.Info("no next number available after otp", "user_id", foundUserID, "platform", platformFound, "country", countryFound)
-	}
+	logger.L.Info("auto-reassign skipped after otp", "user_id", foundUserID, "platform", platformFound, "country", countryFound, "old_number", matched.Number, "menu_message_id", menuMessageID)
 }
