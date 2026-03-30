@@ -36,20 +36,24 @@ type AppConfig struct {
 	Env     string
 }
 
-type ScraperConfig struct {
-	LoginURL string
-	SMSURL   string
+type ScraperAccount struct {
 	Username string
 	Password string
 }
 
+type ScraperConfig struct {
+	LoginURL string
+	SMSURL   string
+	Accounts []ScraperAccount
+}
+
 type RedisConfig struct {
-	Addr       string
-	Password   string
-	DB         int
-	KeyPrefix  string
-	ActiveTTL  int
-	EnableTLS  bool
+	Addr      string
+	Password  string
+	DB        int
+	KeyPrefix string
+	ActiveTTL int
+	EnableTLS bool
 }
 
 type Config struct {
@@ -136,6 +140,24 @@ func parseStringList(raw string) []string {
 	return result
 }
 
+func parseScraperAccounts(raw string) []ScraperAccount {
+	var accounts []ScraperAccount
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		parts := strings.SplitN(s, ":", 2)
+		if len(parts) == 2 {
+			accounts = append(accounts, ScraperAccount{
+				Username: parts[0],
+				Password: parts[1],
+			})
+		}
+	}
+	return accounts
+}
+
 func Load() *Config {
 	if cfg != nil {
 		return cfg
@@ -178,11 +200,20 @@ func Load() *Config {
 	}
 
 	// --- Scraper ---
+	accounts := parseScraperAccounts(os.Getenv("SCRAPER_ACCOUNTS"))
+	// Fallback to legacy single account env vars if list is empty
+	if len(accounts) == 0 {
+		user := os.Getenv("SCRAPER_USERNAME")
+		pass := os.Getenv("SCRAPER_PASSWORD")
+		if user != "" && pass != "" {
+			accounts = append(accounts, ScraperAccount{Username: user, Password: pass})
+		}
+	}
+
 	scraper := ScraperConfig{
 		LoginURL: getDefault("SCRAPER_LOGIN_URL", "http://185.2.83.39/ints/login"),
 		SMSURL:   getDefault("SCRAPER_SMS_URL", "http://185.2.83.39/ints/agent/SMSCDRReports"),
-		Username: os.Getenv("SCRAPER_USERNAME"),
-		Password: os.Getenv("SCRAPER_PASSWORD"),
+		Accounts: accounts,
 	}
 
 	// --- Redis ---

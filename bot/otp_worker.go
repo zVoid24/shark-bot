@@ -42,35 +42,39 @@ const forwardOTPToOwnersEnabled = false
 
 // otpWorker runs as a background goroutine
 func (b *Bot) otpWorker() {
-	logger.L.Info("OTP Worker started")
+	logger.L.Info("OTP Worker started", "scraper_count", len(b.scrapers))
+
+	for _, s := range b.scrapers {
+		go b.runScraperLoop(s)
+	}
+}
+
+func (b *Bot) runScraperLoop(s *Scraper) {
+	logger.L.Info("starting scraper loop", "user", s.username)
 
 	// 1. Initial Login
-	if b.scraper != nil {
-		if err := b.scraper.Login(); err != nil {
-			logger.L.Error("scraper login failed", "err", err)
-		} else {
-			logger.L.Info("scraper login successful")
-		}
+	if err := s.Login(); err != nil {
+		logger.L.Error("scraper login failed", "user", s.username, "err", err)
+	} else {
+		logger.L.Info("scraper login successful", "user", s.username)
 	}
 
 	for {
-		if b.scraper != nil {
-			b.pollScraper()
-		}
+		b.pollScraper(s)
 		// 16s base + 0-4s jitter
 		jitter := time.Duration(rand.Intn(4000)) * time.Millisecond
 		wait := 16*time.Second + jitter
-		log.Info("scraper waiting", "duration", wait.String())
+		logger.L.Debug("scraper waiting", "user", s.username, "duration", wait.String())
 		time.Sleep(wait)
 	}
 }
 
-func (b *Bot) pollScraper() {
-	results, err := b.scraper.FetchSMS()
+func (b *Bot) pollScraper(s *Scraper) {
+	results, err := s.FetchSMS()
 	if err != nil {
-		logger.L.Error("scraper fetch failed", "err", err)
+		logger.L.Error("scraper fetch failed", "user", s.username, "err", err)
 		// Try to re-login if session expired?
-		_ = b.scraper.Login()
+		_ = s.Login()
 		return
 	}
 

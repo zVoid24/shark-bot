@@ -87,10 +87,15 @@ func Serve() {
 		log.Info("redis connected", "addr", cnf.Redis.Addr)
 	}
 
-	// 5.5 Initialize Scraper
-	scrp, err := bot.NewScraper(cnf.Scraper.LoginURL, cnf.Scraper.SMSURL, cnf.Scraper.Username, cnf.Scraper.Password)
-	if err != nil {
-		log.Error("failed to init scraper", "err", err)
+	// 5.5 Initialize Scrapers
+	var scrapers []*bot.Scraper
+	for _, acc := range cnf.Scraper.Accounts {
+		scrp, err := bot.NewScraper(cnf.Scraper.LoginURL, cnf.Scraper.SMSURL, acc.Username, acc.Password)
+		if err != nil {
+			log.Error("failed to init scraper", "user", acc.Username, "err", err)
+			continue
+		}
+		scrapers = append(scrapers, scrp)
 	}
 
 	// 6. Seed initial owner IDs as admins
@@ -116,7 +121,7 @@ func Serve() {
 		statsSvc,
 		seenSvc,
 		processedSvc,
-		scrp,
+		scrapers,
 		redisClient,
 		activeCache,
 		cnf.Telegram.OwnerIDs,

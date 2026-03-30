@@ -35,7 +35,7 @@ type Bot struct {
 	statsSvc     *stats.Service
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
-	scraper      *Scraper
+	scrapers     []*Scraper
 	redisClient  *redis.Client
 	activeCache  *ActiveNumberCache
 	ownerIDs     []string
@@ -61,7 +61,7 @@ func New(
 	statsSvc *stats.Service,
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
-	scraper *Scraper,
+	scrapers []*Scraper,
 	redisClient *redis.Client,
 	activeCache *ActiveNumberCache,
 	ownerIDs []string,
@@ -81,7 +81,7 @@ func New(
 		statsSvc:     statsSvc,
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
-		scraper:      scraper,
+		scrapers:     scrapers,
 		redisClient:  redisClient,
 		activeCache:  activeCache,
 		ownerIDs:     ownerIDs,
