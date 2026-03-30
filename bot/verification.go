@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"shark_bot/pkg/logger"
 	"strings"
@@ -39,6 +40,26 @@ Join both groups using the buttons below, then click "Check Verification" to ver
 
 // isUserVerified checks if a user has joined both required groups
 func (b *Bot) isUserVerified(userID int64) bool {
+	ctx := context.Background()
+	// 1. Check cache first
+	if b.verifyCache != nil && b.verifyCache.IsVerified(ctx, userID) {
+		return true
+	}
+
+	// 2. Perform membership checks via Telegram API
+	isVerified := b.performMembershipChecks(userID)
+
+	// 3. Cache the result if verified
+	if isVerified && b.verifyCache != nil {
+		if err := b.verifyCache.SetVerified(ctx, userID); err != nil {
+			logger.L.Warn("failed to cache verification status", "user_id", userID, "err", err)
+		}
+	}
+
+	return isVerified
+}
+
+func (b *Bot) performMembershipChecks(userID int64) bool {
 	// Check membership in first group
 	if !b.checkGroupMembership(userID, b.verifyGroup1) {
 		return false
@@ -115,9 +136,15 @@ func (b *Bot) checkGroupMembership(userID int64, groupIdentifier string) bool {
 
 // handleVerificationCheck handles the verification check button callback
 func (b *Bot) handleVerificationCheck(cb *tgbotapi.CallbackQuery) {
+	ctx := context.Background()
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 	msgID := cb.Message.MessageID
+
+	// Clear cache to force a fresh check from Telegram
+	if b.verifyCache != nil {
+		_ = b.verifyCache.Clear(ctx, userID)
+	}
 
 	if b.isUserVerified(userID) {
 		// Show success pop-up alert

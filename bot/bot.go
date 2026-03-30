@@ -38,6 +38,7 @@ type Bot struct {
 	scrapers     []*Scraper
 	redisClient  *redis.Client
 	activeCache  *ActiveNumberCache
+	verifyCache  *VerificationCache
 	ownerIDs     []string
 	cooldownSecs int
 	verifyGroup1 string // First group URL/ID to verify membership
@@ -64,6 +65,7 @@ func New(
 	scrapers []*Scraper,
 	redisClient *redis.Client,
 	activeCache *ActiveNumberCache,
+	verifyCache *VerificationCache,
 	ownerIDs []string,
 	cooldownSecs int,
 	verifyGroup1 string,
@@ -84,6 +86,7 @@ func New(
 		scrapers:     scrapers,
 		redisClient:  redisClient,
 		activeCache:  activeCache,
+		verifyCache:  verifyCache,
 		ownerIDs:     ownerIDs,
 		cooldownSecs: cooldownSecs,
 		verifyGroup1:  verifyGroup1,

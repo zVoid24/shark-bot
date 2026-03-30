@@ -87,6 +87,16 @@ func Serve() {
 		log.Info("redis connected", "addr", cnf.Redis.Addr)
 	}
 
+	// 5.3 Initialize Verification Cache (uses Redis if available)
+	var verCache *bot.VerificationCache
+	if redisClient != nil {
+		verCache = bot.NewVerificationCache(
+			redisClient,
+			cnf.Redis.KeyPrefix,
+			2*time.Hour, // 2 hour TTL for verification status
+		)
+	}
+
 	// 5.5 Initialize Scrapers
 	var scrapers []*bot.Scraper
 	for _, acc := range cnf.Scraper.Accounts {
@@ -124,6 +134,7 @@ func Serve() {
 		scrapers,
 		redisClient,
 		activeCache,
+		verCache,
 		cnf.Telegram.OwnerIDs,
 		cnf.Telegram.CooldownSecs,
 		cnf.Telegram.VerifyGroup1,
