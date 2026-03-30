@@ -18,5 +18,5 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT }}
           script: |
-            C:\Users\Administrator\Desktop\bot\shark-bot\deploy.bat
-            C:\Users\Administrator\Desktop\bot\shark-bot-2\deploy.bat
+            cd C:\Users\Administrator\Desktop\bot\shark-bot && cmd /c deploy.bat
+            cd C:\Users\Administrator\Desktop\bot\shark-bot-2 && cmd /c deploy.bat
