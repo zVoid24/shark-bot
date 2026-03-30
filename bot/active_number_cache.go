@@ -1,5 +1,6 @@
 package bot
 
+//testing
 import (
 	"context"
 	"encoding/json"
@@ -128,4 +129,3 @@ func (c *ActiveNumberCache) DeleteByUser(ctx context.Context, userID string) err
 	_, err = pipe.Exec(ctx)
 	return err
 }
-
