@@ -19,3 +19,4 @@ jobs:
           port: ${{ secrets.PORT }}
           script: |
             C:\Users\Administrator\Desktop\bot\shark-bot\deploy.bat
+            C:\Users\Administrator\Desktop\bot\shark-bot-2\deploy.bat
