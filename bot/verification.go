@@ -19,6 +19,9 @@ func (b *Bot) verificationKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonURL("⛧ Join Group 2", b.verifyURL2),
 		),
 		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("📢 Join Group 3", b.verifyURL3),
+		),
+		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("✅ Check Verification", "verify_check"),
 		),
 	)
@@ -28,12 +31,13 @@ func (b *Bot) verificationKeyboard() tgbotapi.InlineKeyboardMarkup {
 func (b *Bot) showVerificationScreen(chatID int64) {
 	msg := `<b>🔐 Verification Required</b>
 
-Before you can use this bot, you must join both of our groups:
+Before you can use this bot, you must join all three of our groups:
 
 <b>📱 Group 1:</b> 𝗦𝗛𝗔𝗥𝗞 𝗦𝗠𝗦 𝗕𝗔𝗖𝗞𝗨𝗣
 <b>⛧ Group 2:</b> 𝙎𝙃𝘼𝙍𝙆 𝙈𝙀𝙏𝙃𝙊𝘿 ⛧
+<b>📢 Group 3:</b> 𝘀𝗵𝗮𝗿𝗸 𝘀𝗺𝘀 𝗽𝗮𝗻𝗲𝗹 𝗻𝘂𝗺𝗯𝗲𝗿𝟭
 
-Join both groups using the buttons below, then click "Check Verification" to verify your membership.`
+Join all three groups using the buttons below, then click "Check Verification" to verify your membership.`
 
 	b.sendHTMLWithMarkup(chatID, msg, b.verificationKeyboard())
 }
@@ -67,6 +71,11 @@ func (b *Bot) performMembershipChecks(userID int64) bool {
 
 	// Check membership in second group
 	if !b.checkGroupMembership(userID, b.verifyGroup2) {
+		return false
+	}
+
+	// Check membership in third group
+	if !b.checkGroupMembership(userID, b.verifyGroup3) {
 		return false
 	}
 
@@ -165,5 +174,5 @@ You can get a phone number by clicking the "Get a Phone Number ☎️" button.`
 	}
 
 	// User is not verified - show an alert pop-up (showAlert=true)
-	b.answerCallback(cb.ID, "❌ You have not joined both groups yet. Please join them first.", true)
+	b.answerCallback(cb.ID, "❌ You have not joined all three groups yet. Please join them first.", true)
 }

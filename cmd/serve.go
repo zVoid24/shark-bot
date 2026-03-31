@@ -139,8 +139,10 @@ func Serve() {
 		cnf.Telegram.CooldownSecs,
 		cnf.Telegram.VerifyGroup1,
 		cnf.Telegram.VerifyGroup2,
+		cnf.Telegram.VerifyGroup3,
 		cnf.Telegram.VerifyURL1,
 		cnf.Telegram.VerifyURL2,
+		cnf.Telegram.VerifyURL3,
 	)
 
 	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {

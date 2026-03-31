@@ -43,8 +43,10 @@ type Bot struct {
 	cooldownSecs int
 	verifyGroup1 string // First group URL/ID to verify membership
 	verifyGroup2 string // Second group URL/ID to verify membership
+	verifyGroup3 string // Third group URL/ID to verify membership
 	verifyURL1   string // First group join redirection URL
 	verifyURL2   string // Second group join redirection URL
+	verifyURL3   string // Third group join redirection URL
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
@@ -70,8 +72,10 @@ func New(
 	cooldownSecs int,
 	verifyGroup1 string,
 	verifyGroup2 string,
+	verifyGroup3 string,
 	verifyURL1 string,
 	verifyURL2 string,
+	verifyURL3 string,
 ) *Bot {
 	return &Bot{
 		api:          api,
@@ -91,8 +95,10 @@ func New(
 		cooldownSecs: cooldownSecs,
 		verifyGroup1:  verifyGroup1,
 		verifyGroup2:  verifyGroup2,
+		verifyGroup3:  verifyGroup3,
 		verifyURL1:    verifyURL1,
 		verifyURL2:    verifyURL2,
+		verifyURL3:    verifyURL3,
 		convState:    make(map[int64]*convContext),
 	}
 }
