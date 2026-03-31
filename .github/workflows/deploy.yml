@@ -23,12 +23,12 @@ jobs:
             echo "🚀 Deploying shark-bot..."
             cd /root/shark-bot
             git pull origin for-now
-            go build -o bot
+            go build -o bot2
 
             echo "🚀 Deploying shark-bot-2..."
             cd /root/shark-bot-2
             git pull origin for-now
-            go build -o bot
+            go build -o sharkbot2
 
             echo "🔁 Restarting services..."
             systemctl restart sharkbot
