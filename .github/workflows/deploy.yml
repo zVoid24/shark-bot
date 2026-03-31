@@ -1,4 +1,4 @@
-name: Deploy Bot to RDP
+name: Deploy Go Bots
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to VPS via SSH (password)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HOST }}
@@ -18,4 +18,20 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT }}
           script: |
-            cd C:\Users\Administrator\Desktop\bot\shark-bot && cmd /c deploy.bat && cd C:\Users\Administrator\Desktop\bot\shark-bot-2 && cmd /c deploy.bat
+            set -e
+
+            echo "🚀 Deploying shark-bot..."
+            cd /root/shark-bot
+            git pull origin for-now
+            go build -o bot
+
+            echo "🚀 Deploying shark-bot-2..."
+            cd /root/shark-bot-2
+            git pull origin for-now
+            go build -o bot
+
+            echo "🔁 Restarting services..."
+            systemctl restart sharkbot
+            systemctl restart sharkbot2
+
+            echo "✅ Deployment done!"
