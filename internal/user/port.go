@@ -9,5 +9,6 @@ type Repository interface {
 	UnblockAll() error
 	GetAllUserIDs() ([]string, error)
 	GetBlockedUsers() ([]string, error)
+	GetUnblockedUserIDs() ([]string, error)
 	GetUser(userID string) (*User, error)
 }

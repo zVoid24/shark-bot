@@ -63,6 +63,12 @@ func (r *UserRepo) GetBlockedUsers() ([]string, error) {
 	return ids, err
 }
 
+func (r *UserRepo) GetUnblockedUserIDs() ([]string, error) {
+	var ids []string
+	err := r.db.Select(&ids, "SELECT user_id FROM users WHERE is_blocked = FALSE")
+	return ids, err
+}
+
 func (r *UserRepo) GetUser(userID string) (*user.User, error) {
 	var u user.User
 	err := r.db.Get(&u, "SELECT user_id, full_name, is_blocked FROM users WHERE user_id = $1", userID)

@@ -37,6 +37,10 @@ func (s *Service) GetBlockedUsers() ([]string, error) {
 	return s.repo.GetBlockedUsers()
 }
 
+func (s *Service) GetUnblockedUserIDs() ([]string, error) {
+	return s.repo.GetUnblockedUserIDs()
+}
+
 func (s *Service) GetUser(userID string) (*User, error) {
 	return s.repo.GetUser(userID)
 }

@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"shark_bot/pkg/logger"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -236,7 +239,7 @@ func (b *Bot) handleBroadcast(msg *tgbotapi.Message) {
 		b.sendHTML(msg.Chat.ID, "<b>Usage: /all [your message]</b>")
 		return
 	}
-	dbUserIDs, _ := b.userSvc.GetAllUserIDs()
+	dbUserIDs, _ := b.userSvc.GetUnblockedUserIDs()
 	registryUserIDs, err := getKnownUserIDs()
 	if err != nil {
 		log.Warn("failed to read user registry", "err", err)
@@ -244,27 +247,81 @@ func (b *Bot) handleBroadcast(msg *tgbotapi.Message) {
 
 	userIDs := mergeUniqueUserIDs(dbUserIDs, registryUserIDs)
 	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>Starting broadcast to %d users...</b>", len(userIDs)))
-	go b.runBroadcast(userIDs, text)
+	go b.runBroadcast(userIDs, text, msg.Chat.ID)
 }
 
-func (b *Bot) runBroadcast(userIDs []string, text string) {
-	batchSize := 20
-	for i := 0; i < len(userIDs); i += batchSize {
-		end := i + batchSize
-		if end > len(userIDs) {
-			end = len(userIDs)
-		}
-		for _, uid := range userIDs[i:end] {
-			var chatID int64
-			fmt.Sscanf(uid, "%d", &chatID)
-			if chatID == 0 {
-				continue
+func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
+	var (
+		successCount int
+		blockedCount int
+		errorCount   int
+		mu           sync.Mutex
+		wg           sync.WaitGroup
+	)
+
+	userChan := make(chan string, 100)
+	workerCount := 30
+	// Telegram allows 30 messages per second. We use ~29/sec to be safe.
+	ticker := time.NewTicker(34 * time.Millisecond)
+	defer ticker.Stop()
+
+	// Start worker pool
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for uid := range userChan {
+				// Throttle based on ticker
+				<-ticker.C
+
+				chatID, err := strconv.ParseInt(uid, 10, 64)
+				if err != nil || chatID == 0 {
+					continue
+				}
+
+				m := tgbotapi.NewMessage(chatID, text)
+				m.ParseMode = tgbotapi.ModeHTML
+
+				_, err = b.api.Send(m)
+				mu.Lock()
+				if err != nil {
+					// Check if user blocked the bot
+					errStr := strings.ToLower(err.Error())
+					if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "blocked") || strings.Contains(errStr, "deactivated") {
+						blockedCount++
+						// Persist the block status in our DB to skip them in future broadcasts
+						_ = b.userSvc.BlockUser(uid)
+					} else {
+						errorCount++
+						log.Error("broadcast send failed", "user_id", uid, "err", err)
+					}
+				} else {
+					successCount++
+				}
+				mu.Unlock()
 			}
-			m := tgbotapi.NewMessage(chatID, text)
-			m.ParseMode = tgbotapi.ModeHTML
-			b.api.Send(m)
-		}
+		}()
 	}
+
+	// Feed workers
+	for _, uid := range userIDs {
+		userChan <- uid
+	}
+	close(userChan)
+
+	// Wait for all messages to be processed
+	wg.Wait()
+
+	// Send final summary to admin
+	summary := fmt.Sprintf("<b>📢 Broadcast Summary</b>\n\n"+
+		"✅ <b>Delivered:</b> <code>%d</code>\n"+
+		"🚫 <b>Blocked/Deactivated:</b> <code>%d</code>\n"+
+		"❌ <b>Errors:</b> <code>%d</code>\n\n"+
+		"👥 <b>Total Users Targetted:</b> <code>%d</code>",
+		successCount, blockedCount, errorCount, len(userIDs))
+
+	b.sendHTML(adminChatID, summary)
+	log.Info("broadcast completed", "success", successCount, "blocked", blockedCount, "errors", errorCount)
 }
 
 func (b *Bot) handleSetNumberLimit(msg *tgbotapi.Message) {

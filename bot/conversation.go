@@ -155,8 +155,8 @@ func (b *Bot) handleConversationDocument(msg *tgbotapi.Message) bool {
 	broadcastMsg := fmt.Sprintf(
 		"<b>🚀 New Numbers Added!</b>\n\n<b>Platform:</b> <code>%s</code>\n<b>Country:</b> <code>%s</code>\n<b>Quantity:</b> <code>%d</code> <b>numbers</b>\n\n<i>Get your number now using the button below!</i>",
 		plat, coun, count)
-	userIDs, _ := b.userSvc.GetAllUserIDs()
-	go b.runBroadcast(userIDs, broadcastMsg)
+	userIDs, _ := b.userSvc.GetUnblockedUserIDs()
+	go b.runBroadcast(userIDs, broadcastMsg, msg.Chat.ID)
 
 	return true
 }
