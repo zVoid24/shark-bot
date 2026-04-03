@@ -45,7 +45,7 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 	}
 
 	if len(platforms) == 0 {
-		text := "<b>No platform available right now.</b>"
+		text := "<b>No platform available</b>"
 		if isEdit {
 			b.safeEdit(chatID, msgID, text, nil)
 		} else {
@@ -54,24 +54,30 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 		return nil
 	}
 
-	var buttons []tgbotapi.InlineKeyboardButton
+	var rows [][]tgbotapi.InlineKeyboardButton
+
 	for _, p := range platforms {
 		count, _ := b.numberSvc.CountAvailable(p, "")
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("%s · %d", p, count),
-			"select_platform::"+p,
+
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("%s (%d)", p, count),
+				"select_platform::"+p,
+			),
 		))
 	}
 
-	rows := buildButtonRows(buttons, 2)
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	text := "<b>Select platform</b>\nChoose a service."
+
+	// ✅ Wider looking message
+	text := "<b>Select platform</b>\nChoose a service below to continue."
 
 	if isEdit {
 		b.safeEdit(chatID, msgID, text, &markup)
 	} else {
 		b.sendHTMLWithMarkup(chatID, text, markup)
 	}
+
 	return nil
 }
 
@@ -79,17 +85,21 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 	countries, err := b.numberSvc.GetCountries(platform)
 	if err != nil || len(countries) == 0 {
-		b.safeEdit(chatID, msgID, "<b>No country available.</b>", nil)
+		b.safeEdit(chatID, msgID, "<b>No country available</b>", nil)
 		return
 	}
 
 	var buttons []tgbotapi.InlineKeyboardButton
+
 	for _, c := range countries {
 		count, _ := b.numberSvc.CountAvailable(platform, c)
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("%s · %d", c, count),
-			fmt.Sprintf("select_country::%s::%s", platform, c),
-		))
+
+		buttons = append(buttons,
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf("%s (%d)", c, count),
+				fmt.Sprintf("select_country::%s::%s", platform, c),
+			),
+		)
 	}
 
 	rows := buildButtonRows(buttons, 2)
@@ -99,7 +109,12 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 	))
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	text := fmt.Sprintf("<b>%s</b>\nChoose country.", platform)
+
+	// ✅ Make message feel wider
+	text := fmt.Sprintf(
+		"<b>%s</b>\nSelect a country to continue.",
+		platform,
+	)
 
 	b.safeEdit(chatID, msgID, text, &markup)
 }
