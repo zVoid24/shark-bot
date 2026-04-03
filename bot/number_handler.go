@@ -154,8 +154,10 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		numDisplay += fmt.Sprintf("<code>%s</code>\n", n)
 	}
 
-	text := fmt.Sprintf("<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"t.me/zVoid24"><i>𝑍𝐴𝐻𝐼𝐷</i></a></b>\n\n<a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz"><i>Method</i></a>",
-		country, platform, numDisplay)
+	text := fmt.Sprintf(
+	"<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"https://t.me/zVoid24\"><i>𝑍𝐴𝐻𝐼𝐷</i></a>\n\n<a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><i>Method</i></a>",
+	country, platform, numDisplay,
+)
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
