@@ -57,7 +57,7 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for _, p := range platforms {
-		count, _ := b.numberSvc.CountAvailable(p, "")
+		//count, _ := b.numberSvc.CountAvailable(p, "")
 
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
@@ -92,7 +92,7 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 	var buttons []tgbotapi.InlineKeyboardButton
 
 	for _, c := range countries {
-		count, _ := b.numberSvc.CountAvailable(platform, c)
+		//count, _ := b. bynumberSvc.CountAvailable(platform, c)
 
 		buttons = append(buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
