@@ -3,13 +3,29 @@ package bot
 import (
 	"context"
 	"fmt"
+	"shark_bot/internal/activenumber"
 	"shark_bot/pkg/logger"
 	"time"
 
-	"shark_bot/internal/activenumber"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+// helper: make keyboard rows with N buttons per row
+func buildButtonRows(buttons []tgbotapi.InlineKeyboardButton, perRow int) [][]tgbotapi.InlineKeyboardButton {
+	if perRow <= 0 {
+		perRow = 1
+	}
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(buttons); i += perRow {
+		end := i + perRow
+		if end > len(buttons) {
+			end = len(buttons)
+		}
+		rows = append(rows, buttons[i:end])
+	}
+	return rows
+}
 
 // handleGetNumber shows the platform list
 func (b *Bot) handleGetNumber(msg *tgbotapi.Message) {
@@ -29,7 +45,7 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 	}
 
 	if len(platforms) == 0 {
-		text := "<b>Sorry, no platforms are available right now.</b>"
+		text := "<b>No platform available right now.</b>"
 		if isEdit {
 			b.safeEdit(chatID, msgID, text, nil)
 		} else {
@@ -38,17 +54,18 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 		return nil
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var buttons []tgbotapi.InlineKeyboardButton
 	for _, p := range platforms {
 		count, _ := b.numberSvc.CountAvailable(p, "")
-		btn := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("%s (%d)", p, count),
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf("%s · %d", p, count),
 			"select_platform::"+p,
-		)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+		))
 	}
+
+	rows := buildButtonRows(buttons, 2)
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	text := "<b>🔧 Select the platform you need to access</b>"
+	text := "<b>Select platform</b>\nChoose a service."
 
 	if isEdit {
 		b.safeEdit(chatID, msgID, text, &markup)
@@ -62,25 +79,29 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 	countries, err := b.numberSvc.GetCountries(platform)
 	if err != nil || len(countries) == 0 {
-		b.safeEdit(chatID, msgID, fmt.Sprintf("<b>Sorry, no countries available for %s.</b>", platform), nil)
+		b.safeEdit(chatID, msgID, "<b>No country available.</b>", nil)
 		return
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var buttons []tgbotapi.InlineKeyboardButton
 	for _, c := range countries {
 		count, _ := b.numberSvc.CountAvailable(platform, c)
-		btn := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("%s (%d)", c, count),
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintf("%s · %d", c, count),
 			fmt.Sprintf("select_country::%s::%s", platform, c),
-		)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
+		))
 	}
-	// Back button
+
+	rows := buildButtonRows(buttons, 2)
+
 	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("⬅️ Back to Platforms", "back_to_platforms"),
+		tgbotapi.NewInlineKeyboardButtonData("⬅ Back", "back_to_platforms"),
 	))
+
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	b.safeEdit(chatID, msgID, fmt.Sprintf("<b>Select your preferred country</b>\n<b>Platform</b>: %s", platform), &markup)
+	text := fmt.Sprintf("<b>%s</b>\nChoose country.", platform)
+
+	b.safeEdit(chatID, msgID, text, &markup)
 }
 
 // assignNumbers picks numbers and assigns them to the user
@@ -90,23 +111,22 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	var excludeNums []string
 
 	if isChange {
-		// Get currently held numbers to exclude
+		// Get currently held numbers to exclude and delete
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			excludeNums = append(excludeNums, a.Number)
-			// Permanently delete the old number so no one else gets it
 			_ = b.numberSvc.DeleteByNumber(a.Number)
 			if b.activeCache != nil {
 				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
 			}
 		}
-		// Release all active numbers for user
+
 		_ = b.activeSvc.DeleteByUser(userIDStr)
 		if b.activeCache != nil {
 			_ = b.activeCache.DeleteByUser(context.Background(), userIDStr)
 		}
 	} else {
-		// Permanently delete any old ones first
+		// Delete any old numbers first
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			_ = b.numberSvc.DeleteByNumber(a.Number)
@@ -114,22 +134,22 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
 			}
 		}
-		// Release from active list
+
 		_ = b.activeSvc.DeleteByUser(userIDStr)
 		if b.activeCache != nil {
 			_ = b.activeCache.DeleteByUser(context.Background(), userIDStr)
 		}
 	}
 
-	// limit := b.settingsSvc.GetNumberLimit(platform, country)
 	numbers, err := b.numberSvc.GetNumbers(platform, country, userIDStr, excludeNums, 1)
 	if err != nil || len(numbers) == 0 {
 		b.safeEdit(chatID, msgID,
-			fmt.Sprintf("<b>Sorry, no numbers are currently available for %s.</b>", country), nil)
+			fmt.Sprintf("<b>No number available</b>\n%s • %s", platform, country),
+			nil,
+		)
 		return
 	}
 
-	// Insert into active_numbers
 	for _, num := range numbers {
 		an := activenumber.ActiveNumber{
 			Number:    num,
@@ -146,38 +166,37 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		_ = b.seenSvc.Add(userIDStr, num, country)
 	}
 
-	// Update message_id for all newly assigned numbers (in case Insert used a stale msgID)
 	_ = b.activeSvc.UpdateMessageID(userIDStr, int64(msgID))
 
-	numDisplay := ""
-	for _, n := range numbers {
-		numDisplay += fmt.Sprintf("<code>%s</code>\n", n)
-	}
+	number := numbers[0]
 
 	text := fmt.Sprintf(
-	"<b>Country:</b> %s\n<b>Platform:</b> %s\n<b>Assigned Number:</b> %s\n<b>OTP Status:</b> Your OTP will arrive shortly in your inbox.\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n<b>📺 Method Guide:</b> <a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><b>Click to Watch</b></a>",
-	country, platform, numDisplay,
+    "<b>✅ Number assigned</b>\n\n<code>%s</code>\n\n<b>Platform:</b> %s\n<b>Country:</b> %s\n\n<i>Waiting for OTP...</i>",
+    number, platform, country,
 )
 
-markup := tgbotapi.NewInlineKeyboardMarkup(
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData(
-			"🔄 Change Number",
-			fmt.Sprintf("change_number::%s::%s", platform, country),
+	markup := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"🔄 Change",
+				fmt.Sprintf("change_number::%s::%s", platform, country),
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				"⬅ Back",
+				fmt.Sprintf("back_to_countries::%s", platform),
+			),
 		),
-tgbotapi.NewInlineKeyboardButtonURL(
-			"📢 OTP Group",
-			"https://t.me/shark_sms_panel",
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL(
+				"📢 OTP Group",
+				"https://t.me/shark_sms_panel",
+			),
+			tgbotapi.NewInlineKeyboardButtonURL(
+				"📺 Guide",
+				"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+			),
 		),
-	),
-	
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData(
-			"⬅️ Back",
-			fmt.Sprintf("back_to_countries::%s", platform),
-		),
-	),
-)
+	)
 
 	b.safeEdit(chatID, msgID, text, &markup)
 }
@@ -191,12 +210,13 @@ func (b *Bot) handleMyStatus(msg *tgbotapi.Message) {
 		return
 	}
 
-	text := "<b>📊 My OTP Usage 📊</b>\n\n"
+	text := "<b>📊 My OTP Usage</b>\n\n"
 	total := 0
 	for _, s := range stats {
-		text += fmt.Sprintf("<b>%s:</b> <code>%d</code> <b>OTPs</b>\n", s.Country, s.Count)
+		text += fmt.Sprintf("%s · <code>%d</code>\n", s.Country, s.Count)
 		total += s.Count
 	}
-	text += fmt.Sprintf("\n<b>Total:</b> <code>%d</code>", total)
+	text += fmt.Sprintf("\n<b>Total</b> · <code>%d</code>", total)
+
 	b.sendHTML(msg.Chat.ID, text)
 }
