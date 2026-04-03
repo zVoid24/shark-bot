@@ -155,23 +155,30 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	}
 
 	text := fmt.Sprintf(
-	"<b>Country:</b> %s\n<b>Platform:</b> %s\n<b>Assigned Number:</b>%s\n\n<b>OTP Status:</b> Your OTP will arrive shortly in your inbox.\nIf not received, please check the OTP Group for your number.\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n<b>📺 Method Guide:</b> <a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><b>Click to Watch</b></a>",
+	"<b>Country:</b> %s\n<b>Platform:</b> %s\n<b>Assigned Number:</b> %s\n<b>OTP Status:</b> Your OTP will arrive shortly in your inbox. If not received, please check the OTP Group for your number.\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n<b>📺 Method Guide:</b> <a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><b>Click to Watch</b></a>",
 	country, platform, numDisplay,
 )
 
-	markup := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔄 Change Number",
-				fmt.Sprintf("change_number::%s::%s", platform, country)),
+markup := tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(
+			"🔄 Change Number",
+			fmt.Sprintf("change_number::%s::%s", platform, country),
 		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("📢 OTP Group", "https://t.me/shark_sms_panel"),
+	),
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonURL(
+			"📢 OTP Group",
+			"https://t.me/shark_sms_panel",
 		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⬅️ Back",
-				fmt.Sprintf("back_to_countries::%s", platform)),
+	),
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(
+			"⬅️ Back",
+			fmt.Sprintf("back_to_countries::%s", platform),
 		),
-	)
+	),
+)
 
 	b.safeEdit(chatID, msgID, text, &markup)
 }
