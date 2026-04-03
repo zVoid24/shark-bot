@@ -155,7 +155,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	}
 
 	text := fmt.Sprintf(
-	"<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Your OTP will arrive shortly in your inbox. If you don’t receive it, please check the OTP Group for OTP.</b>\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n\n<b>📺 Method Guide:</b> <a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\">Click to Watch</a>",
+	"<b>Country:</b> %s\n<b>Platform:</b> %s\n\n<b>Assigned Number:</b>\n%s\n\n<b>OTP Status:</b> Your OTP will arrive shortly in your inbox.\nIf not received, please check the OTP Group for your number.\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n\n<b>📺 Method Guide:</b> <a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><b>Click to Watch</b></a>",
 	country, platform, numDisplay,
 )
 
