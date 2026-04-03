@@ -165,13 +165,12 @@ markup := tgbotapi.NewInlineKeyboardMarkup(
 			"🔄 Change Number",
 			fmt.Sprintf("change_number::%s::%s", platform, country),
 		),
-	),
-	tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonURL(
+tgbotapi.NewInlineKeyboardButtonURL(
 			"📢 OTP Group",
 			"https://t.me/shark_sms_panel",
 		),
 	),
+	
 	tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData(
 			"⬅️ Back",
