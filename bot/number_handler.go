@@ -155,7 +155,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	}
 
 	text := fmt.Sprintf(
-	"<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"https://t.me/zVoid24\"><i>𝑍𝐴𝐻𝐼𝐷</i></a>\n\n<a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\"><i>Method</i></a>",
+	"<b>%s (%s) Number(s) Assigned:</b>\n%s\n<b>Waiting for OTP...</b>\n\nDeveloped by <a href=\"https://t.me/zVoid24\">𝑍𝐴𝐻𝐼𝐷</a>\n\n<b>📺 Method Guide</b>\n<a href=\"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz\">Click to Watch</a>",
 	country, platform, numDisplay,
 )
 
