@@ -48,7 +48,7 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(btn))
 	}
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	text := "<b>🔧 Select the platform you need to access:</b>"
+	text := "<b>🔧 Select the platform you need to access</b>"
 
 	if isEdit {
 		b.safeEdit(chatID, msgID, text, &markup)
@@ -80,7 +80,7 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 		tgbotapi.NewInlineKeyboardButtonData("⬅️ Back to Platforms", "back_to_platforms"),
 	))
 	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
-	b.safeEdit(chatID, msgID, fmt.Sprintf("<b>Select your country for %s:</b>", platform), &markup)
+	b.safeEdit(chatID, msgID, fmt.Sprintf("<b>Select your preferred country</b>\n<b>Platform</b>: %s", platform), &markup)
 }
 
 // assignNumbers picks numbers and assigns them to the user
