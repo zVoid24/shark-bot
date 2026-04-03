@@ -61,7 +61,7 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
-				fmt.Sprintf("%s (%d)", p, count),
+				fmt.Sprintf("%s", p),
 				"select_platform::"+p,
 			),
 		))
@@ -96,7 +96,7 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
 
 		buttons = append(buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
-				fmt.Sprintf("%s (%d)", c, count),
+				fmt.Sprintf("%s", c),
 				fmt.Sprintf("select_country::%s::%s", platform, c),
 			),
 		)
