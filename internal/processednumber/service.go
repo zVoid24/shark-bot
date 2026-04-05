@@ -12,15 +12,20 @@ func NewService(repo Repository) *Service {
 	}
 }
 
-func (s *Service) IsSeen(phoneNumber string) (bool, error) {
-	if s.sessionNumbers[phoneNumber] {
+func (s *Service) fingerprint(phoneNumber, otpCode string) string {
+	return phoneNumber + "|" + otpCode
+}
+
+func (s *Service) IsSeen(phoneNumber, otpCode string) (bool, error) {
+	fp := s.fingerprint(phoneNumber, otpCode)
+	if s.sessionNumbers[fp] {
 		return true, nil
 	}
-	return s.repo.IsSeen(phoneNumber)
+	return s.repo.IsSeen(phoneNumber, otpCode)
 }
 
 func (s *Service) Add(pn ProcessedNumber) error {
-	s.sessionNumbers[pn.PhoneNumber] = true
+	s.sessionNumbers[s.fingerprint(pn.PhoneNumber, pn.OTPCode)] = true
 	return s.repo.Add(pn)
 }
 

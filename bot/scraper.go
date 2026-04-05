@@ -199,7 +199,7 @@ func (s *Scraper) FetchSMS() ([]SMSResult, error) {
 	}
 
 	const timeLayout = "2006-01-02 15:04:05"
-	now := time.Now().UTC()
+	now := time.Now()
 
 	var results []SMSResult
 	for _, row := range dtResult.AAData {
@@ -235,7 +235,7 @@ func (s *Scraper) FetchSMS() ([]SMSResult, error) {
 
 		// Time Filter: Only process messages from the last 15 minutes
 		// Note: We use 15 mins to be safe regarding server vs client clock drift
-		msgTime, err := time.Parse(timeLayout, dateTimeStr)
+		msgTime, err := time.ParseInLocation(timeLayout, dateTimeStr, time.Local)
 		if err == nil {
 			// If message is > 15 mins old and < 24 hours old, skip it.
 			// (We allow very old ones if they are somehow just appearing,

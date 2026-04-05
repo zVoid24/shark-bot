@@ -16,22 +16,44 @@ func NewProcessedNumberRepo(db *sqlx.DB) *ProcessedNumberRepo {
 	return &ProcessedNumberRepo{db: db}
 }
 
-func (r *ProcessedNumberRepo) IsSeen(phoneNumber string) (bool, error) {
+func (r *ProcessedNumberRepo) IsSeen(phoneNumber, otpCode string) (bool, error) {
 	var count int
-	err := r.db.Get(&count, "SELECT COUNT(*) FROM processed_numbers WHERE phone_number = $1", phoneNumber)
+	err := r.db.Get(&count, `
+		SELECT COUNT(*)
+		FROM processed_otp_events
+		WHERE phone_number = $1 AND otp_code = $2
+	`, phoneNumber, otpCode)
 	return count > 0, err
 }
 
 func (r *ProcessedNumberRepo) Add(pn processednumber.ProcessedNumber) error {
-	_, err := r.db.Exec(`
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return err
+	}
+
+	if _, err = tx.Exec(`
 		INSERT INTO processed_numbers (phone_number, otp_code, service_name, posted)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (phone_number) DO UPDATE SET 
 			last_seen = CURRENT_TIMESTAMP,
 			otp_code = EXCLUDED.otp_code,
 			service_name = EXCLUDED.service_name
-	`, pn.PhoneNumber, pn.OTPCode, pn.ServiceName, pn.Posted)
-	return err
+	`, pn.PhoneNumber, pn.OTPCode, pn.ServiceName, pn.Posted); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if _, err = tx.Exec(`
+		INSERT INTO processed_otp_events (phone_number, otp_code, service_name, posted)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (phone_number, otp_code) DO NOTHING
+	`, pn.PhoneNumber, pn.OTPCode, pn.ServiceName, pn.Posted); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r *ProcessedNumberRepo) UpdateLastSeen(phoneNumber string) error {

@@ -85,7 +85,8 @@ func (b *Bot) pollScraper(s *Scraper) {
 
 	newCount := 0
 	for _, res := range results {
-		seen, err := b.processedSvc.IsSeen(res.Number)
+		otp := ExtractOTPCode(res.Message)
+		seen, err := b.processedSvc.IsSeen(res.Number, otp)
 		if err != nil {
 			logger.L.Error("failed to check if number is seen", "err", err)
 			continue
