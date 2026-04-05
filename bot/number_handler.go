@@ -32,17 +32,19 @@ func (b *Bot) handleGetNumber(msg *tgbotapi.Message) {
 	if blocked, _ := b.userSvc.IsBlocked(fmt.Sprintf("%d", msg.From.ID)); blocked {
 		return
 	}
-	if err := b.showPlatformList(msg.Chat.ID, msg.MessageID, false); err != nil {
+	if err := b.showPlatformList(msg.Chat.ID, msg.MessageID, false, fmt.Sprintf("%d", msg.From.ID)); err != nil {
 		logger.L.Error("handleGetNumber failed", "err", err)
 	}
 }
 
 // showPlatformList shows inline keyboard of all platforms
-func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
+func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool, userID string) error {
 	platforms, err := b.numberSvc.GetPlatforms()
 	if err != nil {
 		return err
 	}
+
+	isAdmin := b.isAdmin(userID)
 
 	if len(platforms) == 0 {
 		text := "<b>No platform available</b>"
@@ -57,11 +59,17 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 	var rows [][]tgbotapi.InlineKeyboardButton
 
 	for _, p := range platforms {
-		//count, _ := b.numberSvc.CountAvailable(p, "")
+		label := p
+		if isAdmin {
+			count, err := b.numberSvc.CountAvailable(p, "")
+			if err == nil {
+				label = fmt.Sprintf("%s (%d)", p, count)
+			}
+		}
 
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
-				fmt.Sprintf("%s", p),
+				label,
 				"select_platform::"+p,
 			),
 		))
@@ -82,21 +90,29 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool) error {
 }
 
 // showCountryList shows inline keyboard of countries for a platform
-func (b *Bot) showCountryList(chatID int64, msgID int, platform string) {
+func (b *Bot) showCountryList(chatID int64, msgID int, platform, userID string) {
 	countries, err := b.numberSvc.GetCountries(platform)
 	if err != nil || len(countries) == 0 {
 		b.safeEdit(chatID, msgID, "<b>No country available</b>", nil)
 		return
 	}
 
+	isAdmin := b.isAdmin(userID)
+
 	var buttons []tgbotapi.InlineKeyboardButton
 
 	for _, c := range countries {
-		//count, _ := b. bynumberSvc.CountAvailable(platform, c)
+		label := c
+		if isAdmin {
+			count, err := b.numberSvc.CountAvailable(platform, c)
+			if err == nil {
+				label = fmt.Sprintf("%s (%d)", c, count)
+			}
+		}
 
 		buttons = append(buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
-				fmt.Sprintf("%s", c),
+				label,
 				fmt.Sprintf("select_country::%s::%s", platform, c),
 			),
 		)

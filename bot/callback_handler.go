@@ -46,17 +46,17 @@ func (b *Bot) handleCallback(cb *tgbotapi.CallbackQuery) {
 
 	case data == "back_to_platforms":
 		answer("", false)
-		b.showPlatformList(chatID, msgID, true)
+		b.showPlatformList(chatID, msgID, true, userID)
 
 	case strings.HasPrefix(data, "select_platform::"):
 		answer("", false)
 		platform := strings.TrimPrefix(data, "select_platform::")
-		b.showCountryList(chatID, msgID, platform)
+		b.showCountryList(chatID, msgID, platform, userID)
 
 	case strings.HasPrefix(data, "back_to_countries::"):
 		answer("", false)
 		platform := strings.TrimPrefix(data, "back_to_countries::")
-		b.showCountryList(chatID, msgID, platform)
+		b.showCountryList(chatID, msgID, platform, userID)
 
 	case strings.HasPrefix(data, "select_country::"):
 		answer("", false)
