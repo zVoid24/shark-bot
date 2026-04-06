@@ -202,9 +202,16 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	number := numbers[0]
 
 	text := fmt.Sprintf(
-    "<tg-emoji emoji-id=\"5469931148295547357\">✅</tg-emoji><b> Number assigned successfully</b>\n\n<b>Assigned Number</b>: <code>%s</code>\n\n<b>Platform:</b> %s\n<b>Country:</b> %s\n\n<i>Waiting for OTP...</i>",
-    number, platform, country,
-)
+		`<tg-emoji emoji-id="5469931148295547357">✅</tg-emoji><b> Number assigned successfully</b>
+
+<b>Assigned Number</b>: <code>%s</code>
+
+<b>Platform:</b> %s
+<b>Country:</b> %s
+
+<i>Waiting for OTP...</i>`,
+		number, platform, country,
+	)
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
