@@ -236,7 +236,14 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		),
 	)
 
-	b.safeEdit(chatID, msgID, text, &markup)
+	msg := tgbotapi.NewMessage(chatID, text)
+msg.ParseMode = "HTML"
+msg.ReplyMarkup = markup
+
+_, err := b.api.Send(msg)
+if err != nil {
+    logger.L.Error("send failed", "err", err)
+}
 }
 
 // handleMyStatus shows the user's OTP usage stats
