@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"shark_bot/pkg/logger"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	"math/rand"
-	"shark_bot/internal/activenumber"
 	"shark_bot/internal/processednumber"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -61,9 +59,9 @@ func (b *Bot) runScraperLoop(s *Scraper) {
 
 	for {
 		b.pollScraper(s)
-		// 16s base + 0-4s jitter
-		jitter := time.Duration(rand.Intn(4000)) * time.Millisecond
-		wait := 16*time.Second + jitter
+		// 20s base + 0-5s jitter to avoid website blocking
+		jitter := time.Duration(rand.Intn(5000)) * time.Millisecond
+		wait := 20*time.Second + jitter
 		logger.L.Debug("scraper waiting", "user", s.username, "duration", wait.String())
 		time.Sleep(wait)
 	}
@@ -130,31 +128,26 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 		logger.L.Error("failed to mark number as processed", "num", res.Number, "err", err)
 	}
 
-	// 3. Match with active number and notify user
-	b.matchAndNotify(res.Number, otp, service)
+	// 3. Send directly to central group chat
+	b.sendToCentralGroup(shortCode, flag, service, icon, masked, otp)
 
-	// 4. Forward to owners (temporarily disabled)
-	if forwardOTPToOwnersEnabled {
-		logger.L.Info("forwarding SMS to owners", "num", res.Number, "owners_count", len(b.ownerIDs))
-		b.forwardToOwners(shortCode, flag, service, icon, masked, otp)
-	} else {
-		logger.L.Info("owner OTP forwarding disabled", "num", res.Number)
-	}
+	// 4. Add a small delay between messages to respect Telegram rate limits
+	time.Sleep(1 * time.Second)
 }
 
-func (b *Bot) forwardToOwners(shortCode, flag, service, icon, masked, otp string) {
-	msgText := fmt.Sprintf("%s #%s %s <code>%s</code>\n\n⛩️ 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈 <a href=\"https://t.me/zvoidois\">𝒵𝒶𝒽𝒾𝒹</a> 👁",
+func (b *Bot) sendToCentralGroup(shortCode, flag, service, icon, masked, otp string) {
+	msgText := fmt.Sprintf("%s #%s %s <code>%s</code>\n\n<tg-emoji emoji-id='5888699182734122090'>⛩️</tg-emoji> 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈 <a href=\"https://t.me/shark_sms\">𝙍𝙄𝙕𝙑𝙄</a> <tg-emoji emoji-id='5888704237910627502'>👁</tg-emoji>",
 		flag, shortCode, icon, masked)
 
-	// Custom button types to support copy_text which is missing in the library
+	// Custom button types to support copy_text and custom_emoji_id
 	type CopyTextButton struct {
 		Text string `json:"text"`
 	}
 	type CustomButton struct {
-		Text         string          `json:"text"`
-		CallbackData string          `json:"callback_data,omitempty"`
-		URL          string          `json:"url,omitempty"`
-		CopyText     *CopyTextButton `json:"copy_text,omitempty"`
+		Text          string          `json:"text"`
+		URL           string          `json:"url,omitempty"`
+		CopyText      *CopyTextButton `json:"copy_text,omitempty"`
+		CustomEmojiID string          `json:"icon_custom_emoji_id,omitempty"`
 	}
 
 	keyboard := struct {
@@ -162,151 +155,54 @@ func (b *Bot) forwardToOwners(shortCode, flag, service, icon, masked, otp string
 	}{
 		InlineKeyboard: [][]CustomButton{
 			{
-				{Text: otp, CopyText: &CopyTextButton{Text: otp}},
+				{
+					Text:          otp,
+					CopyText:      &CopyTextButton{Text: otp},
+					CustomEmojiID: "6176966310920983412",
+				},
 			},
 			{
-				{Text: "🤖 Number Bot", URL: "https://t.me/sharknumber2bot"},
-				{Text: "📺 Method", URL: "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz"},
+				{
+					Text:          "Number Bot",
+					URL:           "https://t.me/sharknumber2bot",
+					CustomEmojiID: "5231197925178089666",
+				},
+				{
+					Text:          "Method",
+					URL:           "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+					CustomEmojiID: "5942902988564600402",
+				},
 			},
 		},
 	}
 
-	for _, ownerIDStr := range b.ownerIDs {
-		var ownerChatID int64
-		fmt.Sscanf(ownerIDStr, "%d", &ownerChatID)
-		if ownerChatID != 0 {
-			msg := tgbotapi.NewMessage(ownerChatID, msgText)
-			msg.ParseMode = tgbotapi.ModeHTML
-			msg.ReplyMarkup = keyboard
-			msg.DisableWebPagePreview = true
-			_, err := b.api.Send(msg)
-			if err != nil {
-				logger.L.Error("failed to forward SMS to owner", "owner", ownerIDStr, "err", err)
-			} else {
-				logger.L.Info("successfully forwarded SMS to owner", "owner", ownerIDStr)
+	msg := tgbotapi.NewMessage(b.otpTargetChatID, msgText)
+	msg.ParseMode = tgbotapi.ModeHTML
+	msg.ReplyMarkup = keyboard
+	msg.DisableWebPagePreview = true
+
+	// Retry loop for rate limits
+	for retries := 0; retries < 3; retries++ {
+		_, err := b.api.Send(msg)
+		if err != nil {
+			if apiErr, ok := err.(*tgbotapi.Error); ok && apiErr.Code == 429 {
+				waitSecs := apiErr.RetryAfter
+				if waitSecs <= 0 {
+					waitSecs = 5
+				}
+				logger.L.Warn("rate limited by telegram, retrying", "wait_secs", waitSecs, "retry", retries+1)
+				time.Sleep(time.Duration(waitSecs) * time.Second)
+				continue
 			}
+			logger.L.Error("failed to send OTP to central group", "chat_id", b.otpTargetChatID, "err", err)
+			break
 		}
+		logger.L.Info("successfully sent OTP to central group", "chat_id", b.otpTargetChatID)
+		break
 	}
 }
 
+// matchAndNotify is disabled in OTP-only mode.
 func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
-	// Matching logic similar to lines 147-177 in original otp_worker.go
-	// But we have the full number now! (usually)
-	// If res.Number is full, we can match exactly.
-
-	ctx := context.Background()
-	var matched *activenumber.ActiveNumber
-	var err error
-
-	if b.activeCache != nil {
-		logger.L.Debug("otp redis lookup start", "incoming_number", fullNumber)
-		matched, err = b.activeCache.GetByNumber(ctx, fullNumber)
-		if err != nil {
-			logger.L.Error("redis active-number lookup failed", "number", fullNumber, "err", err)
-			matched = nil
-		} else if matched != nil {
-			logger.L.Info("otp matched via redis", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
-		} else {
-			logger.L.Debug("otp redis miss", "incoming_number", fullNumber)
-		}
-	}
-
-	if matched == nil {
-		logger.L.Debug("otp db fallback lookup start", "incoming_number", fullNumber)
-		allActive, getErr := b.activeSvc.GetAll()
-		if getErr != nil {
-			logger.L.Error("failed to load active numbers for db fallback", "incoming_number", fullNumber, "err", getErr)
-			return
-		}
-
-		cleanFull := onlyDigits.ReplaceAllString(fullNumber, "")
-		for _, an := range allActive {
-			cleanActive := onlyDigits.ReplaceAllString(an.Number, "")
-			if cleanActive == cleanFull || strings.HasSuffix(cleanFull, cleanActive) || strings.HasSuffix(cleanActive, cleanFull) {
-				cp := an
-				matched = &cp
-				break
-			}
-		}
-
-		if matched != nil && b.activeCache != nil {
-			logger.L.Info("otp matched via db fallback", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
-			if setErr := b.activeCache.Set(ctx, *matched); setErr != nil {
-				logger.L.Warn("failed to backfill active-number cache", "number", matched.Number, "user_id", matched.UserID, "err", setErr)
-			} else {
-				logger.L.Debug("backfilled active-number cache", "number", matched.Number, "user_id", matched.UserID)
-			}
-		}
-	}
-
-	if matched == nil {
-		logger.L.Info("otp no active match", "incoming_number", fullNumber, "service", service, "otp", otp)
-		return
-	}
-
-	// Follow same steps as processOTPMessage (steps 179-275)
-	// I'll refactor this into a common method in a follow-up if needed,
-	// but for now let's keep it simple.
-
-	foundUserID := matched.UserID
-	menuMessageID := matched.MessageID
-	platformFound := matched.Platform
-	countryFound := matched.Country
-
-	// Pre-assign next number, delete old, etc. (skipping for initial test if user only wants redirect to owner)
-	// Actually, I'll keep the logic to ensure the user gets their OTP.
-
-	var userChatID int64
-	fmt.Sscanf(foundUserID, "%d", &userChatID)
-	if userChatID != 0 {
-		otpMsg := tgbotapi.NewMessage(userChatID,
-			fmt.Sprintf("<b>✅ OTP Received for</b> <code>%s</code>\n\n<b>🔑 Your %s Code:</b> <code>%s</code>",
-				fullNumber, service, otp))
-		otpMsg.ParseMode = tgbotapi.ModeHTML
-		// Custom button types to support copy_text
-		type CopyTextButton struct {
-			Text string `json:"text"`
-		}
-		type CustomButton struct {
-			Text     string          `json:"text"`
-			CopyText *CopyTextButton `json:"copy_text,omitempty"`
-		}
-
-		otpMsg.ReplyMarkup = struct {
-			InlineKeyboard [][]CustomButton `json:"inline_keyboard"`
-		}{
-			InlineKeyboard: [][]CustomButton{
-				{
-					{Text: otp, CopyText: &CopyTextButton{Text: otp}},
-				},
-			},
-		}
-		if _, sendErr := b.api.Send(otpMsg); sendErr != nil {
-			logger.L.Error("failed to send otp to user", "user_id", foundUserID, "chat_id", userChatID, "incoming_number", fullNumber, "matched_number", matched.Number, "otp", otp, "service", service, "err", sendErr)
-		} else {
-			logger.L.Info("otp sent to user", "user_id", foundUserID, "chat_id", userChatID, "incoming_number", fullNumber, "matched_number", matched.Number, "otp", otp, "service", service)
-		}
-	} else {
-		logger.L.Error("invalid matched user id for otp delivery", "user_id", foundUserID, "incoming_number", fullNumber, "matched_number", matched.Number)
-	}
-
-	// Cleanup only. Reassignment is user-driven via the "Change Number" button.
-	if err := b.numberSvc.DeleteByNumber(matched.Number); err != nil {
-		logger.L.Error("failed to delete matched number from pool", "number", matched.Number, "user_id", foundUserID, "err", err)
-	} else {
-		logger.L.Debug("deleted matched number from pool", "number", matched.Number, "user_id", foundUserID)
-	}
-	if err := b.activeSvc.DeleteByNumber(matched.Number); err != nil {
-		logger.L.Error("failed to delete matched active number", "number", matched.Number, "user_id", foundUserID, "err", err)
-	} else {
-		logger.L.Debug("deleted matched active number", "number", matched.Number, "user_id", foundUserID)
-	}
-	if b.activeCache != nil {
-		if err := b.activeCache.DeleteByNumber(ctx, matched.Number); err != nil {
-			logger.L.Error("failed to delete matched number from redis cache", "number", matched.Number, "user_id", foundUserID, "err", err)
-		} else {
-			logger.L.Debug("deleted matched number from redis cache", "number", matched.Number, "user_id", foundUserID)
-		}
-	}
-	logger.L.Info("auto-reassign skipped after otp", "user_id", foundUserID, "platform", platformFound, "country", countryFound, "old_number", matched.Number, "menu_message_id", menuMessageID)
+	// Logic disabled
 }

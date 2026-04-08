@@ -31,6 +31,7 @@ type TelegramConfig struct {
 	VerifyURL1    string // First group join URL
 	VerifyURL2    string // Second group join URL
 	VerifyURL3    string // Third group join URL
+	OTPTargetChatID int64  // Group ID where OTPs will be forwarded
 }
 
 type AppConfig struct {
@@ -201,6 +202,7 @@ func Load() *Config {
 		VerifyURL1:    getDefault("VERIFY_URL_1", ""),
 		VerifyURL2:    getDefault("VERIFY_URL_2", ""),
 		VerifyURL3:    getDefault("VERIFY_URL_3", ""),
+		OTPTargetChatID: func() int64 { v, _ := strconv.ParseInt(os.Getenv("OTP_TARGET_CHAT_ID"), 10, 64); return v }(),
 	}
 
 	// --- Scraper ---

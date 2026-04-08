@@ -47,6 +47,7 @@ type Bot struct {
 	verifyURL1   string // First group join redirection URL
 	verifyURL2   string // Second group join redirection URL
 	verifyURL3   string // Third group join redirection URL
+	otpTargetChatID int64 // Central group for all OTPs
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
@@ -76,6 +77,7 @@ func New(
 	verifyURL1 string,
 	verifyURL2 string,
 	verifyURL3 string,
+	otpTargetChatID int64,
 ) *Bot {
 	return &Bot{
 		api:          api,
@@ -99,6 +101,7 @@ func New(
 		verifyURL1:    verifyURL1,
 		verifyURL2:    verifyURL2,
 		verifyURL3:    verifyURL3,
+		otpTargetChatID: otpTargetChatID,
 		convState:    make(map[int64]*convContext),
 	}
 }
@@ -174,16 +177,14 @@ func (b *Bot) seedActiveCacheFromDB() {
 	}
 }
 
-// handleUpdate routes each Telegram update and logs it.
+// handleUpdate is now limited to logging to keep the bot in OTP-only mode.
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
-	switch {
-	case update.CallbackQuery != nil:
-		log.Info("callback", "user", update.CallbackQuery.From.ID, "data", update.CallbackQuery.Data)
-		b.handleCallback(update.CallbackQuery)
-
-	case update.Message != nil && update.Message.Chat.IsPrivate():
-		log.Info("private message", "user", update.Message.From.ID, "text", update.Message.Text)
-		b.handlePrivateMessage(update.Message)
+	// Only log updates, do not process them to keep other features "turned off"
+	if update.Message != nil {
+		log.Info("incoming message (ignored)", "user", update.Message.From.ID, "text", update.Message.Text)
+	}
+	if update.CallbackQuery != nil {
+		log.Info("incoming callback (ignored)", "user", update.CallbackQuery.From.ID, "data", update.CallbackQuery.Data)
 	}
 }
 

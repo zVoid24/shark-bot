@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"crypto/tls"
 	"shark_bot/infra/db"
 	"shark_bot/infra/repository"
 	"shark_bot/internal/activenumber"
@@ -17,7 +15,6 @@ import (
 
 	"shark_bot/bot"
 	"shark_bot/config"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
@@ -63,39 +60,11 @@ func Serve() {
 	seenSvc := seennumber.NewService(seenRepo)
 	processedSvc := processednumber.NewService(processedRepo)
 
-	// 5.2 Initialize Redis and active-number cache (optional fallback to DB if unavailable)
-	var redisClient *redis.Client
-	var activeCache *bot.ActiveNumberCache
-	redisOpts := &redis.Options{
-		Addr:     cnf.Redis.Addr,
-		Password: cnf.Redis.Password,
-		DB:       cnf.Redis.DB,
-	}
-	if cnf.Redis.EnableTLS {
-		redisOpts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	}
-	redisClient = redis.NewClient(redisOpts)
-	if err := redisClient.Ping(context.Background()).Err(); err != nil {
-		log.Warn("redis unavailable; continuing with DB-only fallback", "addr", cnf.Redis.Addr, "err", err)
-		redisClient = nil
-	} else {
-		activeCache = bot.NewActiveNumberCache(
-			redisClient,
-			cnf.Redis.KeyPrefix,
-			time.Duration(cnf.Redis.ActiveTTL)*time.Second,
-		)
-		log.Info("redis connected", "addr", cnf.Redis.Addr)
-	}
-
-	// 5.3 Initialize Verification Cache (uses Redis if available)
-	var verCache *bot.VerificationCache
-	if redisClient != nil {
-		verCache = bot.NewVerificationCache(
-			redisClient,
-			cnf.Redis.KeyPrefix,
-			2*time.Hour, // 2 hour TTL for verification status
-		)
-	}
+	// 5.2 Redis is disabled as requested
+	var redisClient *redis.Client = nil
+	var activeCache *bot.ActiveNumberCache = nil
+	var verCache *bot.VerificationCache = nil
+	log.Info("redis disabled for OTP-only mode")
 
 	// 5.5 Initialize Scrapers
 	var scrapers []*bot.Scraper
@@ -143,6 +112,7 @@ func Serve() {
 		cnf.Telegram.VerifyURL1,
 		cnf.Telegram.VerifyURL2,
 		cnf.Telegram.VerifyURL3,
+		cnf.Telegram.OTPTargetChatID,
 	)
 
 	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {
