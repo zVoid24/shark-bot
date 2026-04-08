@@ -217,7 +217,7 @@ func DetectCountry(number string) (string, string) {
 func GetServiceAnimation(service string) string {
 	s := strings.ToLower(service)
 	switch {
-	case containsAny(s, "whatsapp", "ws", "wa", "واتساب", "واتس"):
+	case containsAny(s, "whatsapp", "ws", "واتساب", "واتس"):
 		return "<tg-emoji emoji-id='5188683998125106802'>📞</tg-emoji>"
 	case containsAny(s, "facebook", "fb", "فيسبوك"):
 		return "<tg-emoji emoji-id='5472316036260846378'>💬</tg-emoji>"
@@ -243,33 +243,40 @@ func GetServiceAnimation(service string) string {
 
 func DetectServiceFromMessage(message string) string {
 	m := strings.ToLower(message)
-	patterns := map[string][]string{
-		"WHATSAPP":  {"whatsapp", "wa", "واتساب", "واتس"},
-		"FACEBOOK":  {"facebook", "fb", "فيسبوك"},
-		"TELEGRAM":  {"telegram", "tg", "تيليجرام", "تلي"},
-		"INSTAGRAM": {"instagram", "ig", "انستقرام", "انستا"},
-		"TWITTER":   {"twitter", "x.com", "تويتر"},
-		"TIKTOK":    {"tiktok", "تيك توك", "تيك"},
-		"SNAPCHAT":  {"snapchat", "سناب"},
-		"GOOGLE":    {"google", "gmail", "جوجল", "جميل"},
-		"AMAZON":    {"amazon", "امازون"},
-		"NETFLIX":   {"netflix", "نتفلكس"},
-		"PAYPAL":    {"paypal", "باي بال"},
-		"APPLE":     {"apple", "icloud", "ابل"},
-		"MICROSOFT": {"microsoft", "outlook", "مايكروسوفت"},
-		"UBER":      {"uber", "اوبر"},
-		"BINANCE":   {"binance"},
-		"COINBASE":  {"coinbase"},
-		"SPOTIFY":   {"spotify", "سبوتيفاي"},
-		"YOUTUBE":   {"youtube", "يوتيوب"},
-		"LINKEDIN":  {"linkedin", "لينكد"},
-		"DISCORD":   {"discord", "ديسكورد"},
+
+	type servicePattern struct {
+		name     string
+		keywords []string
 	}
 
-	for service, keywords := range patterns {
-		for _, kw := range keywords {
+	// Order defines priority. More specific services should come first.
+	patterns := []servicePattern{
+		{"TIKTOK", []string{"tiktok", "تيك توك", "تيك"}},
+		{"TELEGRAM", []string{"telegram", "tg", "تيليجرام", "تلي"}},
+		{"WHATSAPP", []string{"whatsapp", "واتساب", "واتس"}}, // Removed "wa" to avoid matching "forward"
+		{"FACEBOOK", []string{"facebook", "fb", "فيسبوك"}},
+		{"INSTAGRAM", []string{"instagram", "ig", "انستقرام", "انستا"}},
+		{"TWITTER", []string{"twitter", "x.com", "تويتر"}},
+		{"SNAPCHAT", []string{"snapchat", "سناب"}},
+		{"GOOGLE", []string{"google", "gmail", "جوجل", "جميل", "g-", "verification code"}},
+		{"AMAZON", []string{"amazon", "امازون"}},
+		{"NETFLIX", []string{"netflix", "نتفلكس"}},
+		{"PAYPAL", []string{"paypal", "باي بال"}},
+		{"APPLE", []string{"apple", "icloud", "ابل"}},
+		{"MICROSOFT", []string{"microsoft", "outlook", "مايكروسوفت"}},
+		{"UBER", []string{"uber", "اوبر"}},
+		{"BINANCE", []string{"binance"}},
+		{"COINBASE", []string{"coinbase"}},
+		{"SPOTIFY", []string{"spotify", "سبوتيفاي"}},
+		{"YOUTUBE", []string{"youtube", "يوتيوب"}},
+		{"LINKEDIN", []string{"linkedin", "لينكد"}},
+		{"DISCORD", []string{"discord", "ديسكورد"}},
+	}
+
+	for _, p := range patterns {
+		for _, kw := range p.keywords {
 			if strings.Contains(m, kw) {
-				return service
+				return p.name
 			}
 		}
 	}
