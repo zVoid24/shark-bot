@@ -39,6 +39,7 @@ type SMSResult struct {
 	ShortCode   string
 	FlagEmoji   string
 	ServiceIcon string
+	Account     string
 }
 
 func NewScraper(loginURL, smsURL, username, password string) (*Scraper, error) {
@@ -52,7 +53,7 @@ func NewScraper(loginURL, smsURL, username, password string) (*Scraper, error) {
 		smsURL:   smsURL,
 		username: username,
 		password: password,
-		log:      logger.New("scraper"),
+		log:      logger.New("scraper").With("user", username),
 	}, nil
 }
 
@@ -238,9 +239,10 @@ func (s *Scraper) FetchSMS() ([]SMSResult, error) {
 			Number:   number,
 			Service:  serviceCol,
 			Message:  message,
+			Account:  s.username,
 		})
 	}
 
-	s.log.Info("fetch complete", "records_found", len(results))
+	s.log.Info("fetch complete", "count", len(results))
 	return results, nil
 }

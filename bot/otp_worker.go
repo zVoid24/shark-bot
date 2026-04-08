@@ -95,13 +95,11 @@ func (b *Bot) pollScraper(s *Scraper) {
 
 		// New SMS found!
 		newCount++
-		logger.L.Info("new SMS detected from scraper", "num", res.Number, "msg", res.Message)
+		logger.L.Info("new SMS detected from scraper", "num", res.Number, "msg", res.Message, "user", s.username)
 		b.processScrapedSMS(res)
 	}
 
-	if newCount > 0 {
-		logger.L.Info("scraper processing complete", "new_processed", newCount)
-	}
+	logger.L.Info("scraper poll complete", "user", s.username, "total", len(results), "new", newCount, "skipped", len(results)-newCount)
 }
 
 func (b *Bot) processScrapedSMS(res SMSResult) {
@@ -115,7 +113,7 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 	}
 	icon := GetServiceAnimation(service)
 
-	logger.L.Info("extracted SMS details", "num", res.Number, "otp", otp, "service", service, "country", shortCode)
+	logger.L.Info("extracted SMS details", "num", res.Number, "otp", otp, "service", service, "country", shortCode, "user", res.Account)
 
 	// 2. Mark as seen first to avoid duplicates
 	err := b.processedSvc.Add(processednumber.ProcessedNumber{
@@ -129,13 +127,13 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 	}
 
 	// 3. Send directly to central group chat
-	b.sendToCentralGroup(shortCode, flag, service, icon, masked, otp)
+	b.sendToCentralGroup(shortCode, flag, service, icon, masked, otp, res.Account)
 
 	// 4. Add a small delay between messages to respect Telegram rate limits
 	time.Sleep(2 * time.Second)
 }
 
-func (b *Bot) sendToCentralGroup(shortCode, flag, service, icon, masked, otp string) {
+func (b *Bot) sendToCentralGroup(shortCode, flag, service, icon, masked, otp, user string) {
 	msgText := fmt.Sprintf("%s #%s %s <code>%s</code>\n\n<tg-emoji emoji-id='5888699182734122090'>⛩️</tg-emoji> 𝙿𝙾𝚆𝙴𝚁𝙴𝙳 𝙱𝚈 <a href=\"https://t.me/shark_sms\">𝙍𝙄𝙕𝙑𝙄</a> <tg-emoji emoji-id='5888704237910627502'>👁</tg-emoji>",
 		flag, shortCode, icon, masked)
 
@@ -194,10 +192,10 @@ func (b *Bot) sendToCentralGroup(shortCode, flag, service, icon, masked, otp str
 				time.Sleep(time.Duration(waitSecs) * time.Second)
 				continue
 			}
-			logger.L.Error("failed to send OTP to central group", "chat_id", b.otpTargetChatID, "err", err)
+			logger.L.Error("failed to send OTP to central group", "chat_id", b.otpTargetChatID, "err", err, "user", user)
 			break
 		}
-		logger.L.Info("successfully sent OTP to central group", "chat_id", b.otpTargetChatID)
+		logger.L.Info("successfully sent OTP to central group", "chat_id", b.otpTargetChatID, "user", user)
 		break
 	}
 }
