@@ -218,21 +218,25 @@ func GetServiceAnimation(service string) string {
 	s := strings.ToLower(service)
 	switch {
 	case containsAny(s, "whatsapp", "ws", "wa", "واتساب", "واتس"):
-		return "<tg-emoji emoji-id='5334998226636390258'>📞</tg-emoji>"
+		return "<tg-emoji emoji-id='5188683998125106802'>📞</tg-emoji>"
 	case containsAny(s, "facebook", "fb", "فيسبوك"):
-		return "<tg-emoji emoji-id='5323261730283863478'>💬</tg-emoji>"
+		return "<tg-emoji emoji-id='5472316036260846378'>💬</tg-emoji>"
 	case containsAny(s, "telegram", "tg", "تيليجرام", "تلي"):
-		return "<tg-emoji emoji-id='5330237710655306682'>👉</tg-emoji>"
+		return "<tg-emoji emoji-id='5471949924658588235'>👉</tg-emoji>"
 	case containsAny(s, "instagram", "ig", "انستقرام", "انستا"):
-		return "<tg-emoji emoji-id='5319160079465857105'>📷</tg-emoji>"
+		return "<tg-emoji emoji-id='5470138474956860872'>📷</tg-emoji>"
 	case containsAny(s, "twitter", "x", "تويتر"):
-		return "<tg-emoji emoji-id='5224499567197700690'>🐦</tg-emoji>"
+		return "<tg-emoji emoji-id='5471974195518777283'>🐦</tg-emoji>"
 	case containsAny(s, "tiktok", "تيك توك", "تيك"):
-		return "<tg-emoji emoji-id='5224601903383457698'>🎵</tg-emoji>"
+		return "<tg-emoji emoji-id='5472371913785354427'>🎵</tg-emoji>"
+	case containsAny(s, "youtube", "yotube", "يوتيوب"):
+		return "<tg-emoji emoji-id='5474626994954052801'>▶️</tg-emoji>"
+	case containsAny(s, "google", "gmail", "جوجل", "جميل"):
+		return "<tg-emoji emoji-id='5469931148295547357'>📱</tg-emoji>"
 	case containsAny(s, "snapchat", "snap", "سناب"):
-		return "<tg-emoji emoji-id='5222345550904439270'>👻</tg-emoji>"
-	case containsAny(s, "google", "gmail", "جوجল", "جميل"):
-		return "<tg-emoji emoji-id='5222029789203804982'>🔍</tg-emoji>"
+		return "<tg-emoji emoji-id='5472246178617765188'>🎨</tg-emoji>" // Best fit for the remaining one
+	case containsAny(s, "discord", "ديسكورد"):
+		return "<tg-emoji emoji-id='5472312316819155855'>💬</tg-emoji>"
 	}
 	return ""
 }
