@@ -132,7 +132,7 @@ func (b *Bot) processScrapedSMS(res SMSResult) {
 	b.sendToCentralGroup(shortCode, flag, service, icon, masked, otp)
 
 	// 4. Add a small delay between messages to respect Telegram rate limits
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 func (b *Bot) sendToCentralGroup(shortCode, flag, service, icon, masked, otp string) {
