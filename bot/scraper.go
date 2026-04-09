@@ -18,8 +18,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-var captPattern = regexp.MustCompile(`What is (\d+)\s*\+\s*(\d+)\s*=\s*\?\s*:`)
-var ajaxSourcePattern = regexp.MustCompile(`"sAjaxSource":\s*"(res/data_smscdr\.php\?[^"]+)"`)
+var captPattern = regexp.MustCompile(`What is\s*(\d+)\s*\+\s*(\d+)\s*=\s*\?\s*`)
+var ajaxSourcePattern = regexp.MustCompile(`"sAjaxSource":\s*"([^"]+\.php\?[^"]+)"`)
 
 type Scraper struct {
 	client   *http.Client
@@ -112,25 +112,48 @@ func (s *Scraper) Login() error {
 		data.Set("capt", strconv.Itoa(captAnswer))
 	}
 
-	loginResp, err := s.client.PostForm(signinURL, data)
+	req, err := http.NewRequest("POST", signinURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		s.log.Error("failed to create login request", "err", err)
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Referer", s.loginURL)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	loginResp, err := s.client.Do(req)
 	if err != nil {
 		s.log.Error("login post failed", "err", err)
 		return err
 	}
 	defer loginResp.Body.Close()
 
-	if loginResp.StatusCode != http.StatusOK {
+	if loginResp.StatusCode != http.StatusOK && loginResp.StatusCode != http.StatusFound {
 		s.log.Error("login failed status", "status", loginResp.Status)
 		return fmt.Errorf("login failed with status: %d", loginResp.StatusCode)
 	}
 
 	// 4. Verify login by checking if "Logout" or specific dashboard elements exist
-	// Or check final URL if it redirected
+	finalPageBody, _ := io.ReadAll(loginResp.Body)
+	pageContent := string(finalPageBody)
 	finalURL := loginResp.Request.URL.String()
 	s.log.Info("login post complete", "final_url", finalURL, "status", loginResp.Status)
 
-	if strings.Contains(strings.ToLower(finalURL), "login") || strings.Contains(strings.ToLower(finalURL), "signin") {
-		// If still on login/signin page, it likely failed
+	// Robust success check: if we see "Logout" or "Sign Out", it's a success
+	lowerContent := strings.ToLower(pageContent)
+	if strings.Contains(lowerContent, "logout") || strings.Contains(lowerContent, "sign out") || strings.Contains(lowerContent, "signout") {
+		s.log.Info("login successful (detected logout link)", "redirected_to", finalURL)
+		return nil
+	}
+
+	// Check for explicit error message
+	if strings.Contains(pageContent, "Invalid") || strings.Contains(pageContent, "Error") {
+		s.log.Error("login failed with error message on page", "url", finalURL)
+		return fmt.Errorf("login failed: invalid credentials or CAPTCHA")
+	}
+
+	if (strings.Contains(strings.ToLower(finalURL), "login") || strings.Contains(strings.ToLower(finalURL), "signin")) && !strings.Contains(lowerContent, "logout") {
+		// If still on login/signin page and no logout link found, it likely failed
 		s.log.Error("still on login/signin page after post, login likely failed", "url", finalURL)
 		return fmt.Errorf("login failed: redirected back to login/signin page")
 	}
@@ -163,8 +186,17 @@ func (s *Scraper) FetchSMS() ([]SMSResult, error) {
 	ajaxPath := matches[1]
 
 	// 3. Construct full AJAX URL and encode properly
-	baseURL := s.smsURL[:strings.LastIndex(s.smsURL, "/")+1]
-	ajaxURL := baseURL + ajaxPath
+	// If ajaxPath is relative, make it absolute based on smsURL
+	var ajaxURL string
+	if strings.HasPrefix(ajaxPath, "http") {
+		ajaxURL = ajaxPath
+	} else {
+		baseURL := s.smsURL
+		if lastSlash := strings.LastIndex(baseURL, "/"); lastSlash != -1 {
+			baseURL = baseURL[:lastSlash+1]
+		}
+		ajaxURL = baseURL + ajaxPath
+	}
 	ajaxURL = strings.ReplaceAll(ajaxURL, " ", "%20")
 
 	s.log.Info("polling AJAX source", "url", ajaxURL)

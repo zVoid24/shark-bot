@@ -32,6 +32,7 @@ type TelegramConfig struct {
 	VerifyURL2    string // Second group join URL
 	VerifyURL3    string // Third group join URL
 	OTPTargetChatID int64  // Group ID where OTPs will be forwarded
+	ListenEnabled   bool   // Whether to poll for updates
 }
 
 type AppConfig struct {
@@ -42,6 +43,8 @@ type AppConfig struct {
 type ScraperAccount struct {
 	Username string
 	Password string
+	LoginURL string // Optional: overrides global LoginURL
+	SMSURL   string // Optional: overrides global SMSURL
 }
 
 type ScraperConfig struct {
@@ -150,11 +153,29 @@ func parseScraperAccounts(raw string) []ScraperAccount {
 		if s == "" {
 			continue
 		}
+
+		// Format: username:password@loginURL|smsURL
+		// Or: username:password
+		var loginURL, smsURL string
+		if atIdx := strings.Index(s, "@"); atIdx != -1 {
+			urls := s[atIdx+1:]
+			s = s[:atIdx]
+			urlParts := strings.SplitN(urls, "|", 2)
+			if len(urlParts) >= 1 {
+				loginURL = urlParts[0]
+			}
+			if len(urlParts) >= 2 {
+				smsURL = urlParts[1]
+			}
+		}
+
 		parts := strings.SplitN(s, ":", 2)
 		if len(parts) == 2 {
 			accounts = append(accounts, ScraperAccount{
 				Username: parts[0],
 				Password: parts[1],
+				LoginURL: loginURL,
+				SMSURL:   smsURL,
 			})
 		}
 	}
@@ -203,6 +224,7 @@ func Load() *Config {
 		VerifyURL2:    getDefault("VERIFY_URL_2", ""),
 		VerifyURL3:    getDefault("VERIFY_URL_3", ""),
 		OTPTargetChatID: func() int64 { v, _ := strconv.ParseInt(os.Getenv("OTP_TARGET_CHAT_ID"), 10, 64); return v }(),
+		ListenEnabled:   getBoolDefault("TELEGRAM_LISTEN_ENABLED", true),
 	}
 
 	// --- Scraper ---

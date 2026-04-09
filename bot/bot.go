@@ -48,6 +48,7 @@ type Bot struct {
 	verifyURL2   string // Second group join redirection URL
 	verifyURL3   string // Third group join redirection URL
 	otpTargetChatID int64 // Central group for all OTPs
+	listenEnabled   bool  // Whether to listen for updates
 	// Conversation state per user (for add/remove number flow)
 	convState map[int64]*convContext
 }
@@ -78,6 +79,7 @@ func New(
 	verifyURL2 string,
 	verifyURL3 string,
 	otpTargetChatID int64,
+	listenEnabled bool,
 ) *Bot {
 	return &Bot{
 		api:          api,
@@ -102,6 +104,7 @@ func New(
 		verifyURL2:    verifyURL2,
 		verifyURL3:    verifyURL3,
 		otpTargetChatID: otpTargetChatID,
+		listenEnabled:   listenEnabled,
 		convState:    make(map[int64]*convContext),
 	}
 }
@@ -121,6 +124,12 @@ func (b *Bot) Start() {
 		go b.otpWorker()
 	} else {
 		log.Info("OTP worker disabled")
+	}
+
+	if !b.listenEnabled {
+		log.Info("update listener disabled (OTP-only mode)")
+		// We still need to keep the process alive if there are goroutines running
+		select {}
 	}
 
 	u := tgbotapi.NewUpdate(0)
@@ -149,6 +158,11 @@ func (b *Bot) StartWebhook(webhookURL string, port int) {
 	if err != nil {
 		log.Error("failed to set webhook", "err", err)
 		panic(err)
+	}
+
+	if !b.listenEnabled {
+		log.Info("webhook listener disabled (OTP-relay only)")
+		return
 	}
 
 	updates := b.api.ListenForWebhook("/")

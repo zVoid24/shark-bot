@@ -69,7 +69,16 @@ func Serve() {
 	// 5.5 Initialize Scrapers
 	var scrapers []*bot.Scraper
 	for _, acc := range cnf.Scraper.Accounts {
-		scrp, err := bot.NewScraper(cnf.Scraper.LoginURL, cnf.Scraper.SMSURL, acc.Username, acc.Password)
+		loginURL := acc.LoginURL
+		if loginURL == "" {
+			loginURL = cnf.Scraper.LoginURL
+		}
+		smsURL := acc.SMSURL
+		if smsURL == "" {
+			smsURL = cnf.Scraper.SMSURL
+		}
+
+		scrp, err := bot.NewScraper(loginURL, smsURL, acc.Username, acc.Password)
 		if err != nil {
 			log.Error("failed to init scraper", "user", acc.Username, "err", err)
 			continue
@@ -113,6 +122,7 @@ func Serve() {
 		cnf.Telegram.VerifyURL2,
 		cnf.Telegram.VerifyURL3,
 		cnf.Telegram.OTPTargetChatID,
+		cnf.Telegram.ListenEnabled,
 	)
 
 	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {

@@ -82,43 +82,8 @@ func (b *Bot) pollScraper(s *Scraper) {
 	}
 
 	newCount := 0
-	oldSkipped := 0
-
-	// 1. Find the newest message as the reference "Now" for the scraper
-	var latestTime time.Time
-	const timeLayout = "2006-01-02 15:04:05"
-	for _, res := range results {
-		t, err := time.ParseInLocation(timeLayout, res.DateTime, time.Local)
-		if err == nil {
-			if t.After(latestTime) {
-				latestTime = t
-			}
-		}
-	}
-
-	// 2. Log timing info for debugging
-	if !latestTime.IsZero() {
-		offset := time.Since(latestTime)
-		logger.L.Debug("scraper timing info",
-			"user", s.username,
-			"latest_sms", latestTime.Format(timeLayout),
-			"server_now", time.Now().Format(timeLayout),
-			"detected_offset", offset.String(),
-		)
-	}
 
 	for _, res := range results {
-		// 3. Skip if older than 15 minutes relative to the NEWEST message found
-		if !latestTime.IsZero() {
-			msgTime, err := time.ParseInLocation(timeLayout, res.DateTime, time.Local)
-			if err == nil {
-				if latestTime.Sub(msgTime) > 15*time.Minute {
-					oldSkipped++
-					continue
-				}
-			}
-		}
-
 		otp := ExtractOTPCode(res.Message)
 		seen, err := b.processedSvc.IsSeen(res.Number, otp)
 		if err != nil {
@@ -139,8 +104,7 @@ func (b *Bot) pollScraper(s *Scraper) {
 		"user", s.username,
 		"total", len(results),
 		"new", newCount,
-		"skipped_old", oldSkipped,
-		"skipped_dup", len(results)-newCount-oldSkipped,
+		"skipped_dup", len(results)-newCount,
 	)
 }
 
