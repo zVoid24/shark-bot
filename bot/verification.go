@@ -64,19 +64,19 @@ func (b *Bot) isUserVerified(userID int64) bool {
 }
 
 func (b *Bot) performMembershipChecks(userID int64) bool {
-	// Check membership in first group
-	if !b.checkGroupMembership(userID, b.verifyGroup1) {
-		return false
+	groups := []string{b.verifyGroup1, b.verifyGroup2, b.verifyGroup3}
+	results := make(chan bool, len(groups))
+
+	for _, g := range groups {
+		go func(groupIdentifier string) {
+			results <- b.checkGroupMembership(userID, groupIdentifier)
+		}(g)
 	}
 
-	// Check membership in second group
-	if !b.checkGroupMembership(userID, b.verifyGroup2) {
-		return false
-	}
-
-	// Check membership in third group
-	if !b.checkGroupMembership(userID, b.verifyGroup3) {
-		return false
+	for i := 0; i < len(groups); i++ {
+		if !<-results {
+			return false
+		}
 	}
 
 	return true

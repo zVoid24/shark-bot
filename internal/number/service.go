@@ -33,8 +33,8 @@ func (s *Service) DeleteByPlatformCountry(platform, country string) error {
 	return s.repo.DeleteByPlatformCountry(platform, country)
 }
 
-func (s *Service) DeleteByNumber(number string) error {
-	return s.repo.DeleteByNumber(number)
+func (s *Service) DeleteSpecific(number, platform, country string) error {
+	return s.repo.DeleteSpecific(number, platform, country)
 }
 
 func (s *Service) BulkInsert(platform, country string, numbers []string) (int, error) {

@@ -20,7 +20,7 @@ func NewActiveNumberRepo(db *sqlx.DB) *ActiveNumberRepo {
 
 func (r *ActiveNumberRepo) Insert(an activenumber.ActiveNumber) error {
 	_, err := r.db.Exec(`INSERT INTO active_numbers (number, user_id, timestamp, message_id, platform, country)
-		VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (number) DO NOTHING`,
+		VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (number, platform) DO NOTHING`,
 		an.Number, an.UserID, an.Timestamp, an.MessageID, an.Platform, an.Country)
 	return err
 }
@@ -32,10 +32,10 @@ func (r *ActiveNumberRepo) GetByUser(userID string) ([]activenumber.ActiveNumber
 	return ans, err
 }
 
-func (r *ActiveNumberRepo) GetByNumber(number string) (*activenumber.ActiveNumber, error) {
+func (r *ActiveNumberRepo) GetByNumber(number, platform string) (*activenumber.ActiveNumber, error) {
 	var an activenumber.ActiveNumber
 	err := r.db.Get(&an, `SELECT number, user_id, timestamp, message_id, platform, country
-		FROM active_numbers WHERE number = $1`, number)
+		FROM active_numbers WHERE number = $1 AND platform = $2`, number, platform)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -53,8 +53,8 @@ func (r *ActiveNumberRepo) DeleteByUser(userID string) error {
 	return err
 }
 
-func (r *ActiveNumberRepo) DeleteByNumber(number string) error {
-	_, err := r.db.Exec("DELETE FROM active_numbers WHERE number = $1", number)
+func (r *ActiveNumberRepo) DeleteByNumber(number, platform string) error {
+	_, err := r.db.Exec("DELETE FROM active_numbers WHERE number = $1 AND platform = $2", number, platform)
 	return err
 }
 

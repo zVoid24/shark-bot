@@ -42,50 +42,48 @@ const forwardOTPToOwnersEnabled = false
 
 // otpWorker runs as a background goroutine
 func (b *Bot) otpWorker() {
-	logger.L.Info("OTP Worker started", "scraper_count", len(b.scrapers))
-
-	for _, s := range b.scrapers {
-		go b.runScraperLoop(s)
+	if b.crapiClient == nil {
+		logger.L.Warn("OTP Worker: CR API Client not initialized, skipping")
+		return
 	}
+	logger.L.Info("OTP Worker started using CR API")
+	go b.runCRAPILoop()
 }
 
-func (b *Bot) runScraperLoop(s *Scraper) {
-	logger.L.Info("starting scraper loop", "user", s.username)
-
-	// 1. Initial Login
-	if err := s.Login(); err != nil {
-		logger.L.Error("scraper login failed", "user", s.username, "err", err)
-	} else {
-		logger.L.Info("scraper login successful", "user", s.username)
-	}
+func (b *Bot) runCRAPILoop() {
+	logger.L.Info("starting CR API loop")
 
 	for {
-		b.pollScraper(s)
-		// 16s base + 0-4s jitter
+		b.pollCRAPI()
+		// 16s base + 0-4s jitter (matching legacy behavior)
 		jitter := time.Duration(rand.Intn(4000)) * time.Millisecond
 		wait := 16*time.Second + jitter
-		logger.L.Debug("scraper waiting", "user", s.username, "duration", wait.String())
+		logger.L.Debug("CR API waiting", "duration", wait.String())
 		time.Sleep(wait)
 	}
 }
 
-func (b *Bot) pollScraper(s *Scraper) {
-	results, err := s.FetchSMS()
+func (b *Bot) pollCRAPI() {
+	results, err := b.crapiClient.FetchSMS()
 	if err != nil {
-		logger.L.Error("scraper fetch failed", "user", s.username, "err", err)
-		// Try to re-login if session expired?
-		_ = s.Login()
+		logger.L.Error("CR API fetch failed", "err", err)
 		return
 	}
 
 	if len(results) == 0 {
-		logger.L.Debug("scraper found no messages")
+		logger.L.Debug("CR API found no messages")
 		return
 	}
 
+	b.processResults(results)
+}
+
+func (b *Bot) processResults(results []SMSResult) {
 	newCount := 0
 	for _, res := range results {
 		otp := ExtractOTPCode(res.Message)
+		// We use both Number AND OTP to check if seen, to avoid duplicate posts
+		// if multiple numbers get the same OTP (unlikely but possible).
 		seen, err := b.processedSvc.IsSeen(res.Number, otp)
 		if err != nil {
 			logger.L.Error("failed to check if number is seen", "err", err)
@@ -97,12 +95,12 @@ func (b *Bot) pollScraper(s *Scraper) {
 
 		// New SMS found!
 		newCount++
-		logger.L.Info("new SMS detected from scraper", "num", res.Number, "msg", res.Message)
+		logger.L.Info("new SMS detected from CR API", "num", res.Number, "msg", res.Message)
 		b.processScrapedSMS(res)
 	}
 
 	if newCount > 0 {
-		logger.L.Info("scraper processing complete", "new_processed", newCount)
+		logger.L.Info("CR API processing complete", "new_processed", newCount)
 	}
 }
 
@@ -199,42 +197,41 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	var err error
 
 	if b.activeCache != nil {
-		logger.L.Debug("otp redis lookup start", "incoming_number", fullNumber)
-		matched, err = b.activeCache.GetByNumber(ctx, fullNumber)
+		logger.L.Debug("otp redis lookup start", "incoming_number", fullNumber, "service", service)
+		matched, err = b.activeCache.GetByNumber(ctx, fullNumber, service)
 		if err != nil {
 			logger.L.Error("redis active-number lookup failed", "number", fullNumber, "err", err)
 			matched = nil
 		} else if matched != nil {
-			logger.L.Info("otp matched via redis", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
+			logger.L.Info("otp matched via redis", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID, "platform", matched.Platform)
 		} else {
-			logger.L.Debug("otp redis miss", "incoming_number", fullNumber)
+			logger.L.Debug("otp redis miss", "incoming_number", fullNumber, "service", service)
 		}
 	}
 
 	if matched == nil {
-		logger.L.Debug("otp db fallback lookup start", "incoming_number", fullNumber)
-		allActive, getErr := b.activeSvc.GetAll()
-		if getErr != nil {
-			logger.L.Error("failed to load active numbers for db fallback", "incoming_number", fullNumber, "err", getErr)
-			return
-		}
-
-		cleanFull := onlyDigits.ReplaceAllString(fullNumber, "")
-		for _, an := range allActive {
-			cleanActive := onlyDigits.ReplaceAllString(an.Number, "")
-			if cleanActive == cleanFull || strings.HasSuffix(cleanFull, cleanActive) || strings.HasSuffix(cleanActive, cleanFull) {
-				cp := an
-				matched = &cp
-				break
+		logger.L.Debug("otp db fallback lookup start", "incoming_number", fullNumber, "service", service)
+		// Try to find by number AND platform now
+		matched, err = b.activeSvc.GetByNumber(fullNumber, service)
+		if err != nil {
+			logger.L.Error("failed to load active number for db fallback", "incoming_number", fullNumber, "err", err)
+			// Final fallback: try to find by number alone (might be less accurate but works if platform names differ slightly)
+			allActive, _ := b.activeSvc.GetAll()
+			cleanFull := onlyDigits.ReplaceAllString(fullNumber, "")
+			for _, an := range allActive {
+				cleanActive := onlyDigits.ReplaceAllString(an.Number, "")
+				if cleanActive == cleanFull || strings.HasSuffix(cleanFull, cleanActive) || strings.HasSuffix(cleanActive, cleanFull) {
+					cp := an
+					matched = &cp
+					break
+				}
 			}
 		}
 
 		if matched != nil && b.activeCache != nil {
-			logger.L.Info("otp matched via db fallback", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID)
+			logger.L.Info("otp matched via db fallback", "incoming_number", fullNumber, "matched_number", matched.Number, "user_id", matched.UserID, "platform", matched.Platform)
 			if setErr := b.activeCache.Set(ctx, *matched); setErr != nil {
 				logger.L.Warn("failed to backfill active-number cache", "number", matched.Number, "user_id", matched.UserID, "err", setErr)
-			} else {
-				logger.L.Debug("backfilled active-number cache", "number", matched.Number, "user_id", matched.UserID)
 			}
 		}
 	}
@@ -291,18 +288,18 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	}
 
 	// Cleanup only. Reassignment is user-driven via the "Change Number" button.
-	if err := b.numberSvc.DeleteByNumber(matched.Number); err != nil {
+	if err := b.numberSvc.DeleteSpecific(matched.Number, matched.Platform, matched.Country); err != nil {
 		logger.L.Error("failed to delete matched number from pool", "number", matched.Number, "user_id", foundUserID, "err", err)
 	} else {
 		logger.L.Debug("deleted matched number from pool", "number", matched.Number, "user_id", foundUserID)
 	}
-	if err := b.activeSvc.DeleteByNumber(matched.Number); err != nil {
+	if err := b.activeSvc.DeleteByNumber(matched.Number, matched.Platform); err != nil {
 		logger.L.Error("failed to delete matched active number", "number", matched.Number, "user_id", foundUserID, "err", err)
 	} else {
 		logger.L.Debug("deleted matched active number", "number", matched.Number, "user_id", foundUserID)
 	}
 	if b.activeCache != nil {
-		if err := b.activeCache.DeleteByNumber(ctx, matched.Number); err != nil {
+		if err := b.activeCache.DeleteByNumber(ctx, matched.Number, matched.Platform); err != nil {
 			logger.L.Error("failed to delete matched number from redis cache", "number", matched.Number, "user_id", foundUserID, "err", err)
 		} else {
 			logger.L.Debug("deleted matched number from redis cache", "number", matched.Number, "user_id", foundUserID)

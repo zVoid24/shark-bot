@@ -6,10 +6,10 @@ import "time"
 type Repository interface {
 	Insert(an ActiveNumber) error
 	GetByUser(userID string) ([]ActiveNumber, error)
-	GetByNumber(number string) (*ActiveNumber, error)
+	GetByNumber(number, platform string) (*ActiveNumber, error)
 	GetAll() ([]ActiveNumber, error)
 	DeleteByUser(userID string) error
-	DeleteByNumber(number string) error
+	DeleteByNumber(number, platform string) error
 	UpdateMessageID(userID string, msgID int64) error
 	DeleteAll() error
 	CleanupExpired(ttl time.Duration) error

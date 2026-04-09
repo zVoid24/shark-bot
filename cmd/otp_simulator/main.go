@@ -77,14 +77,14 @@ func main() {
 
 	fmt.Printf("Simulating scraper OTP: number=%s otp=%s service=%s\n", incomingNumber, *otp, *service)
 
-	matched, err := resolveMatch(ctx, cache, activeSvc, incomingNumber)
+	matched, err := resolveMatch(ctx, cache, activeSvc, incomingNumber, *service)
 	if err != nil {
 		panic(err)
 	}
 	if matched == nil {
 		fmt.Printf("No match for provided number %s. Falling back to user's active number %s\n", incomingNumber, targetActive.Number)
 		incomingNumber = targetActive.Number
-		matched, err = resolveMatch(ctx, cache, activeSvc, incomingNumber)
+		matched, err = resolveMatch(ctx, cache, activeSvc, incomingNumber, *service)
 		if err != nil {
 			panic(err)
 		}
@@ -159,9 +159,9 @@ func pickActiveNumber(activeSvc *activenumber.Service, userID, incomingNumber st
 	return &userPrimary, nil
 }
 
-func resolveMatch(ctx context.Context, cache *bot.ActiveNumberCache, activeSvc *activenumber.Service, incomingNumber string) (*activenumber.ActiveNumber, error) {
+func resolveMatch(ctx context.Context, cache *bot.ActiveNumberCache, activeSvc *activenumber.Service, incomingNumber, service string) (*activenumber.ActiveNumber, error) {
 	if cache != nil {
-		matched, err := cache.GetByNumber(ctx, incomingNumber)
+		matched, err := cache.GetByNumber(ctx, incomingNumber, service)
 		if err == nil && matched != nil {
 			fmt.Println("Matched via Redis cache")
 			return matched, nil

@@ -41,8 +41,8 @@ func (c *ActiveNumberCache) NormalizeNumber(number string) string {
 	return cacheDigitOnly.ReplaceAllString(number, "")
 }
 
-func (c *ActiveNumberCache) activeKey(normalizedNumber string) string {
-	return fmt.Sprintf("%s:active:number:%s", c.keyPrefix, normalizedNumber)
+func (c *ActiveNumberCache) activeKey(normalizedNumber, platform string) string {
+	return fmt.Sprintf("%s:active:number:%s:plat:%s", c.keyPrefix, normalizedNumber, platform)
 }
 
 func (c *ActiveNumberCache) userSetKey(userID string) string {
@@ -60,23 +60,24 @@ func (c *ActiveNumberCache) Set(ctx context.Context, an activenumber.ActiveNumbe
 	}
 
 	userSetKey := c.userSetKey(an.UserID)
-	activeKey := c.activeKey(normalized)
+	activeKey := c.activeKey(normalized, an.Platform)
 
 	pipe := c.client.Pipeline()
 	pipe.Set(ctx, activeKey, payload, c.ttl)
-	pipe.SAdd(ctx, userSetKey, normalized)
+	// We store "normalized:platform" in the user's set
+	pipe.SAdd(ctx, userSetKey, fmt.Sprintf("%s:%s", normalized, an.Platform))
 	pipe.Expire(ctx, userSetKey, c.ttl)
 	_, err = pipe.Exec(ctx)
 	return err
 }
 
-func (c *ActiveNumberCache) GetByNumber(ctx context.Context, number string) (*activenumber.ActiveNumber, error) {
+func (c *ActiveNumberCache) GetByNumber(ctx context.Context, number, platform string) (*activenumber.ActiveNumber, error) {
 	normalized := c.NormalizeNumber(number)
 	if normalized == "" {
 		return nil, nil
 	}
 
-	data, err := c.client.Get(ctx, c.activeKey(normalized)).Bytes()
+	data, err := c.client.Get(ctx, c.activeKey(normalized, platform)).Bytes()
 	if err == redis.Nil {
 		return nil, nil
 	}
@@ -91,39 +92,38 @@ func (c *ActiveNumberCache) GetByNumber(ctx context.Context, number string) (*ac
 	return &an, nil
 }
 
-func (c *ActiveNumberCache) DeleteByNumber(ctx context.Context, number string) error {
+func (c *ActiveNumberCache) DeleteByNumber(ctx context.Context, number, platform string) error {
 	normalized := c.NormalizeNumber(number)
 	if normalized == "" {
 		return nil
 	}
 
-	an, err := c.GetByNumber(ctx, number)
-	if err != nil {
-		return err
-	}
-
-	activeKey := c.activeKey(normalized)
-	if an != nil {
-		pipe := c.client.Pipeline()
-		pipe.Del(ctx, activeKey)
-		pipe.SRem(ctx, c.userSetKey(an.UserID), normalized)
-		_, err = pipe.Exec(ctx)
-		return err
-	}
-
-	return c.client.Del(ctx, activeKey).Err()
+	activeKey := c.activeKey(normalized, platform)
+	pipe := c.client.Pipeline()
+	pipe.Del(ctx, activeKey)
+	// We don't easily know the user here to remove from SRem without a lookup, 
+	// but user set will eventually expire or be cleaned up in DeleteByUser
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 func (c *ActiveNumberCache) DeleteByUser(ctx context.Context, userID string) error {
 	userKey := c.userSetKey(userID)
-	numbers, err := c.client.SMembers(ctx, userKey).Result()
+	entries, err := c.client.SMembers(ctx, userKey).Result()
 	if err != nil && err != redis.Nil {
 		return err
 	}
 
 	pipe := c.client.Pipeline()
-	for _, n := range numbers {
-		pipe.Del(ctx, c.activeKey(n))
+	for _, entry := range entries {
+		// entry is "normalized:platform"
+		parts := strings.Split(entry, ":")
+		if len(parts) == 2 {
+			pipe.Del(ctx, c.activeKey(parts[0], parts[1]))
+		} else {
+			// fallback for old format keys
+			pipe.Del(ctx, fmt.Sprintf("%s:active:number:%s", c.keyPrefix, entry))
+		}
 	}
 	pipe.Del(ctx, userKey)
 	_, err = pipe.Exec(ctx)

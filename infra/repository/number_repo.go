@@ -34,21 +34,21 @@ func (r *NumberRepo) CountAvailable(platform, country string) (int, error) {
 	var count int
 	var err error
 	if platform != "" && country != "" {
-		err = r.db.Get(&count, `SELECT COUNT(*) FROM platform_numbers
+		err = r.db.Get(&count, `SELECT COUNT(*) FROM platform_numbers pn
 			WHERE platform = $1 AND country = $2
-			AND number NOT IN (SELECT number FROM active_numbers)`, platform, country)
+			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)`, platform, country)
 	} else if platform != "" {
-		err = r.db.Get(&count, `SELECT COUNT(*) FROM platform_numbers
+		err = r.db.Get(&count, `SELECT COUNT(*) FROM platform_numbers pn
 			WHERE platform = $1
-			AND number NOT IN (SELECT number FROM active_numbers)`, platform)
+			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)`, platform)
 	}
 	return count, err
 }
 
 func (r *NumberRepo) GetNumbers(platform, country, userID string, excludeNums []string, limit int) ([]string, error) {
-	q1 := `SELECT number FROM platform_numbers
+	q1 := `SELECT number FROM platform_numbers pn
 		WHERE platform = $1 AND country = $2
-		AND number NOT IN (SELECT number FROM active_numbers)
+		AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 		AND number NOT IN (SELECT number FROM seen_numbers WHERE user_id = $3)
 		ORDER BY RANDOM() LIMIT $4`
 	var numbers []string
@@ -68,16 +68,16 @@ func (r *NumberRepo) GetNumbers(platform, country, userID string, excludeNums []
 			args = append(args, n)
 		}
 		args = append(args, limit)
-		q2 := fmt.Sprintf(`SELECT number FROM platform_numbers
+		q2 := fmt.Sprintf(`SELECT number FROM platform_numbers pn
 			WHERE platform = $1 AND country = $2
-			AND number NOT IN (SELECT number FROM active_numbers)
+			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 			AND number NOT IN (%s)
 			ORDER BY RANDOM() LIMIT $%d`, strings.Join(placeholders, ","), len(args))
 		err = r.db.Select(&numbers, q2, args...)
 	} else {
-		err = r.db.Select(&numbers, `SELECT number FROM platform_numbers
+		err = r.db.Select(&numbers, `SELECT number FROM platform_numbers pn
 			WHERE platform = $1 AND country = $2
-			AND number NOT IN (SELECT number FROM active_numbers)
+			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 			ORDER BY RANDOM() LIMIT $3`, platform, country, limit)
 	}
 	return numbers, err
@@ -85,9 +85,9 @@ func (r *NumberRepo) GetNumbers(platform, country, userID string, excludeNums []
 
 func (r *NumberRepo) GetNextNumber(platform, country, excludeNum string) (string, error) {
 	var n string
-	err := r.db.Get(&n, `SELECT number FROM platform_numbers
+	err := r.db.Get(&n, `SELECT number FROM platform_numbers pn
 		WHERE platform = $1 AND country = $2 AND number != $3
-		AND number NOT IN (SELECT number FROM active_numbers)
+		AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 		ORDER BY RANDOM() LIMIT 1`, platform, country, excludeNum)
 	return n, err
 }
@@ -97,8 +97,8 @@ func (r *NumberRepo) DeleteByPlatformCountry(platform, country string) error {
 	return err
 }
 
-func (r *NumberRepo) DeleteByNumber(num string) error {
-	_, err := r.db.Exec("DELETE FROM platform_numbers WHERE number = $1", num)
+func (r *NumberRepo) DeleteSpecific(num, platform, country string) error {
+	_, err := r.db.Exec("DELETE FROM platform_numbers WHERE number = $1 AND platform = $2 AND country = $3", num, platform, country)
 	return err
 }
 
@@ -121,6 +121,7 @@ func (r *NumberRepo) BulkInsert(platform, country string, numbers []string) (int
 }
 
 func (r *NumberRepo) GetPlatformForNumber(num string) (*number.PlatformNumber, error) {
+	// This might return multiple if the same number is in multiple platforms, but we keep compatibility
 	var pn number.PlatformNumber
 	err := r.db.Get(&pn, "SELECT id, platform, country, number FROM platform_numbers WHERE number = $1 LIMIT 1", num)
 	return &pn, err

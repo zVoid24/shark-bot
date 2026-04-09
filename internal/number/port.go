@@ -8,7 +8,7 @@ type Repository interface {
 	GetNumbers(platform, country, userID string, excludeNums []string, limit int) ([]string, error)
 	GetNextNumber(platform, country, excludeNum string) (string, error)
 	DeleteByPlatformCountry(platform, country string) error
-	DeleteByNumber(number string) error
+	DeleteSpecific(number, platform, country string) error
 	BulkInsert(platform, country string, numbers []string) (int, error)
 	GetPlatformForNumber(number string) (*PlatformNumber, error)
 }

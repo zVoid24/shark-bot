@@ -49,6 +49,11 @@ type ScraperConfig struct {
 	Accounts []ScraperAccount
 }
 
+type CRAPIConfig struct {
+	URL   string
+	Token string
+}
+
 type RedisConfig struct {
 	Addr      string
 	Password  string
@@ -63,6 +68,7 @@ type Config struct {
 	Database DatabaseConfig
 	Telegram TelegramConfig
 	Scraper  ScraperConfig
+	CRAPI    CRAPIConfig
 	Redis    RedisConfig
 }
 
@@ -220,6 +226,12 @@ func Load() *Config {
 		Accounts: accounts,
 	}
 
+	// --- CR API ---
+	crapi := CRAPIConfig{
+		URL:   getDefault("CR_API_URL", "http://147.135.212.197/crapi/had/viewstats"),
+		Token: os.Getenv("CR_API_TOKEN"),
+	}
+
 	// --- Redis ---
 	redis := RedisConfig{
 		Addr:      getDefault("REDIS_ADDR", "127.0.0.1:6379"),
@@ -235,6 +247,7 @@ func Load() *Config {
 		Database: dbCfg,
 		Telegram: tg,
 		Scraper:  scraper,
+		CRAPI:    crapi,
 		Redis:    redis,
 	}
 

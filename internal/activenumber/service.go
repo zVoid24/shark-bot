@@ -19,8 +19,8 @@ func (s *Service) GetByUser(userID string) ([]ActiveNumber, error) {
 	return s.repo.GetByUser(userID)
 }
 
-func (s *Service) GetByNumber(number string) (*ActiveNumber, error) {
-	return s.repo.GetByNumber(number)
+func (s *Service) GetByNumber(number, platform string) (*ActiveNumber, error) {
+	return s.repo.GetByNumber(number, platform)
 }
 
 func (s *Service) GetAll() ([]ActiveNumber, error) {
@@ -31,8 +31,8 @@ func (s *Service) DeleteByUser(userID string) error {
 	return s.repo.DeleteByUser(userID)
 }
 
-func (s *Service) DeleteByNumber(number string) error {
-	return s.repo.DeleteByNumber(number)
+func (s *Service) DeleteByNumber(number, platform string) error {
+	return s.repo.DeleteByNumber(number, platform)
 }
 
 func (s *Service) UpdateMessageID(userID string, msgID int64) error {

@@ -146,9 +146,9 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			excludeNums = append(excludeNums, a.Number)
-			_ = b.numberSvc.DeleteByNumber(a.Number)
+			_ = b.numberSvc.DeleteSpecific(a.Number, a.Platform, a.Country)
 			if b.activeCache != nil {
-				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
+				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number, a.Platform)
 			}
 		}
 
@@ -160,9 +160,9 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		// Delete any old numbers first
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
-			_ = b.numberSvc.DeleteByNumber(a.Number)
+			_ = b.numberSvc.DeleteSpecific(a.Number, a.Platform, a.Country)
 			if b.activeCache != nil {
-				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number)
+				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number, a.Platform)
 			}
 		}
 

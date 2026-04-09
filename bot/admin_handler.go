@@ -221,7 +221,7 @@ func (b *Bot) handleResetAll(msg *tgbotapi.Message) {
 		acts, _ := b.activeSvc.GetAll()
 		ctx := context.Background()
 		for _, an := range acts {
-			_ = b.activeCache.DeleteByNumber(ctx, an.Number)
+			_ = b.activeCache.DeleteByNumber(ctx, an.Number, an.Platform)
 		}
 	}
 	_ = b.activeSvc.DeleteAll()

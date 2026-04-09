@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
@@ -36,6 +37,7 @@ type Bot struct {
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
 	scrapers     []*Scraper
+	crapiClient  *CRAPIClient
 	redisClient  *redis.Client
 	activeCache  *ActiveNumberCache
 	verifyCache  *VerificationCache
@@ -65,6 +67,7 @@ func New(
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
 	scrapers []*Scraper,
+	crapiClient *CRAPIClient,
 	redisClient *redis.Client,
 	activeCache *ActiveNumberCache,
 	verifyCache *VerificationCache,
@@ -88,6 +91,7 @@ func New(
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
 		scrapers:     scrapers,
+		crapiClient:  crapiClient,
 		redisClient:  redisClient,
 		activeCache:  activeCache,
 		verifyCache:  verifyCache,
@@ -182,8 +186,12 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		b.handleCallback(update.CallbackQuery)
 
 	case update.Message != nil && update.Message.Chat.IsPrivate():
-		log.Info("private message", "user", update.Message.From.ID, "text", update.Message.Text)
+		start := time.Now()
+		log.Info("<- incoming private message", "user", update.Message.From.ID, "text", update.Message.Text)
+		
 		b.handlePrivateMessage(update.Message)
+		
+		log.Info("-> processed private message", "user", update.Message.From.ID, "duration", time.Since(start).String())
 	}
 }
 
