@@ -77,6 +77,10 @@ func Serve() {
 		scrapers = append(scrapers, scrp)
 	}
 
+	// 5.6 Initialize CR API Client
+	crapiClient := bot.NewCRAPIClient(cnf.CRAPI.URL, cnf.CRAPI.Token)
+
+
 	// 6. Seed initial owner IDs as admins
 	if err := adminSvc.SeedOwners(cnf.Telegram.OwnerIDs); err != nil {
 		log.Warn("could not seed owners", "err", err)
@@ -101,6 +105,7 @@ func Serve() {
 		seenSvc,
 		processedSvc,
 		scrapers,
+		crapiClient,
 		redisClient,
 		activeCache,
 		verCache,
@@ -114,6 +119,7 @@ func Serve() {
 		cnf.Telegram.VerifyURL3,
 		cnf.Telegram.OTPTargetChatID,
 	)
+
 
 	if cnf.Telegram.EnableWebhook && cnf.Telegram.WebhookURL != "" {
 		b.StartWebhook(cnf.Telegram.WebhookURL, cnf.Telegram.ListenPort)

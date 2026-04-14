@@ -4,8 +4,8 @@ package bot
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"shark_bot/internal/activenumber"
+
 	"shark_bot/internal/admin"
 	"shark_bot/internal/number"
 	"shark_bot/internal/processednumber"
@@ -36,7 +36,9 @@ type Bot struct {
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
 	scrapers     []*Scraper
+	crapiClient  *CRAPIClient
 	redisClient  *redis.Client
+
 	activeCache  *ActiveNumberCache
 	verifyCache  *VerificationCache
 	ownerIDs     []string
@@ -66,6 +68,7 @@ func New(
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
 	scrapers []*Scraper,
+	crapiClient *CRAPIClient,
 	redisClient *redis.Client,
 	activeCache *ActiveNumberCache,
 	verifyCache *VerificationCache,
@@ -90,6 +93,7 @@ func New(
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
 		scrapers:     scrapers,
+		crapiClient:  crapiClient,
 		redisClient:  redisClient,
 		activeCache:  activeCache,
 		verifyCache:  verifyCache,
@@ -106,15 +110,10 @@ func New(
 	}
 }
 
-// Start begins the polling loop.
+
+// Start begins the background worker without polling for updates.
 func (b *Bot) Start() {
-	b.api.Debug = false
-	if _, err := b.api.Request(tgbotapi.DeleteWebhookConfig{DropPendingUpdates: true}); err != nil {
-		log.Warn("failed to delete existing webhook before polling", "err", err)
-	} else {
-		log.Info("cleared webhook before polling")
-	}
-	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
+	log.Info("bot starting in push-only mode", "username", b.api.Self.UserName)
 
 	if otpWorkerEnabled {
 		b.seedActiveCacheFromDB()
@@ -123,19 +122,13 @@ func (b *Bot) Start() {
 		log.Info("OTP worker disabled")
 	}
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates := b.api.GetUpdatesChan(u)
-
-	for update := range updates {
-		go b.handleUpdate(update)
-	}
+	// Keep the main goroutine alive
+	select {}
 }
 
-// StartWebhook starts the bot using Telegram webhooks.
+// StartWebhook is also push-only now.
 func (b *Bot) StartWebhook(webhookURL string, port int) {
-	b.api.Debug = false
-	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
+	log.Info("bot starting in push-only mode (webhook loop disabled)", "username", b.api.Self.UserName)
 
 	if otpWorkerEnabled {
 		b.seedActiveCacheFromDB()
@@ -144,21 +137,10 @@ func (b *Bot) StartWebhook(webhookURL string, port int) {
 		log.Info("OTP worker disabled")
 	}
 
-	wh, _ := tgbotapi.NewWebhook(webhookURL)
-	_, err := b.api.Request(wh)
-	if err != nil {
-		log.Error("failed to set webhook", "err", err)
-		panic(err)
-	}
-
-	updates := b.api.ListenForWebhook("/")
-	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-
-	for update := range updates {
-		log.Info("<- incoming update", "id", update.UpdateID)
-		go b.handleUpdate(update)
-	}
+	// Keep the main goroutine alive
+	select {}
 }
+
 
 func (b *Bot) seedActiveCacheFromDB() {
 	if b.activeCache == nil {

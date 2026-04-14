@@ -59,13 +59,20 @@ type RedisConfig struct {
 	EnableTLS bool
 }
 
+type CRAPIConfig struct {
+	URL   string
+	Token string
+}
+
 type Config struct {
 	App      AppConfig
 	Database DatabaseConfig
 	Telegram TelegramConfig
 	Scraper  ScraperConfig
+	CRAPI    CRAPIConfig
 	Redis    RedisConfig
 }
+
 
 var cfg *Config
 
@@ -232,13 +239,20 @@ func Load() *Config {
 		EnableTLS: getBoolDefault("REDIS_ENABLE_TLS", false),
 	}
 
+	crapi := CRAPIConfig{
+		URL:   getDefault("CR_API_URL", "http://51.77.216.195/crapi/mait/viewstats"),
+		Token: os.Getenv("CR_API_TOKEN"),
+	}
+
 	cfg = &Config{
 		App:      app,
 		Database: dbCfg,
 		Telegram: tg,
 		Scraper:  scraper,
+		CRAPI:    crapi,
 		Redis:    redis,
 	}
+
 
 	return cfg
 }

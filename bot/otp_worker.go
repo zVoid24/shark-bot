@@ -45,9 +45,89 @@ func (b *Bot) otpWorker() {
 	for _, s := range b.scrapers {
 		go b.runScraperLoop(s)
 	}
+
+	if b.crapiClient != nil {
+		go b.runCRAPILoop()
+	}
+}
+
+func (b *Bot) runCRAPILoop() {
+	logger.L.Info("starting CR API loop")
+
+	for {
+		b.pollCRAPI()
+		// 20s base + 0-5s jitter to avoid website blocking
+		jitter := time.Duration(rand.Intn(5000)) * time.Millisecond
+		wait := 20*time.Second + jitter
+		logger.L.Debug("CR API waiting", "duration", wait.String())
+		time.Sleep(wait)
+	}
+}
+
+func (b *Bot) pollCRAPI() {
+	results, err := b.crapiClient.FetchSMS()
+	if err != nil {
+		logger.L.Error("CR API fetch failed", "err", err)
+		return
+	}
+
+	if len(results) == 0 {
+		logger.L.Debug("CR API found no messages")
+		return
+	}
+
+	newCount := 0
+	oldSkipped := 0
+
+	// 1. Find the newest message as the reference "Now"
+	var latestTime time.Time
+	const timeLayout = "2006-01-02 15:04:05"
+	for _, res := range results {
+		t, err := time.ParseInLocation(timeLayout, res.DateTime, time.Local)
+		if err == nil {
+			if t.After(latestTime) {
+				latestTime = t
+			}
+		}
+	}
+
+	for _, res := range results {
+		// 2. Skip if older than 15 minutes relative to the NEWEST message found
+		if !latestTime.IsZero() {
+			msgTime, err := time.ParseInLocation(timeLayout, res.DateTime, time.Local)
+			if err == nil {
+				if latestTime.Sub(msgTime) > 15*time.Minute {
+					oldSkipped++
+					continue
+				}
+			}
+		}
+
+		otp := ExtractOTPCode(res.Message)
+		seen, err := b.processedSvc.IsSeen(res.Number, otp)
+		if err != nil {
+			logger.L.Error("failed to check if number is seen", "err", err)
+			continue
+		}
+		if seen {
+			continue
+		}
+
+		// New SMS found!
+		newCount++
+		logger.L.Info("new SMS detected from CR API", "num", res.Number, "msg", res.Message)
+		b.processScrapedSMS(res)
+	}
+
+	logger.L.Info("CR API poll complete",
+		"total", len(results),
+		"new", newCount,
+		"skipped_old", oldSkipped,
+	)
 }
 
 func (b *Bot) runScraperLoop(s *Scraper) {
+
 	logger.L.Info("starting scraper loop", "user", s.username)
 
 	// 1. Initial Login
