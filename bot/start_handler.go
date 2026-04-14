@@ -62,9 +62,37 @@ func (b *Bot) handleStart(msg *tgbotapi.Message) {
 
 	// User is verified, show welcome message
 	welcome := fmt.Sprintf(
-		"<b>Hi %s!</b>\n\n<b>You can get a phone number by clicking the \"Get a Phone Number ☎️\" button below.</b>",
+		"<b>👋 Welcome back, %s!</b>\n\n"+
+			"🚀 <b>Everything is ready for you to start.</b>\n\n"+
+			"📱 Click the button below to get your phone numbers and start receiving OTPs instantly.\n\n"+
+			"🎥 <i>Need help? Check out our professional guide on YouTube!</i>",
 		fullName)
-	b.sendWithReplyKeyboard(msg.Chat.ID, welcome, mainKeyboard())
+
+	markup := CustomMarkup{
+		InlineKeyboard: [][]CustomButton{
+			{
+				{
+					Text:          "📺 Watch Guide",
+					URL:           "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+					CustomEmojiID: "5942902988564600402",
+				},
+			},
+		},
+	}
+
+	reply := tgbotapi.NewMessage(msg.Chat.ID, welcome)
+	reply.ParseMode = tgbotapi.ModeHTML
+	reply.ReplyMarkup = markup
+	if _, err := b.api.Send(reply); err != nil {
+		logger.L.Error("failed to send welcome message", "err", err)
+	}
+
+
+	// Also send the main reply keyboard to ensure it's visible
+	keyboardMsg := tgbotapi.NewMessage(msg.Chat.ID, "⬇️ <b>Use the menu below to navigate:</b>")
+	keyboardMsg.ParseMode = tgbotapi.ModeHTML
+	keyboardMsg.ReplyMarkup = mainKeyboard()
+	b.api.Send(keyboardMsg)
 }
 
 // ---- User cooldown tracking ----

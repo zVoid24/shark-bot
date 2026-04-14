@@ -42,36 +42,37 @@ const forwardOTPToOwnersEnabled = false
 
 // otpWorker runs as a background goroutine
 func (b *Bot) otpWorker() {
-	if b.crapiClient == nil {
-		logger.L.Warn("OTP Worker: CR API Client not initialized, skipping")
+	if len(b.crapiClients) == 0 {
+		logger.L.Warn("OTP Worker: No CR API Clients initialized, skipping")
 		return
 	}
-	logger.L.Info("OTP Worker started using CR API")
-	go b.runCRAPILoop()
+	logger.L.Info("OTP Worker started", "clients_count", len(b.crapiClients))
+	for i, client := range b.crapiClients {
+		go b.runCRAPILoop(i+1, client)
+	}
 }
 
-func (b *Bot) runCRAPILoop() {
-	logger.L.Info("starting CR API loop")
+func (b *Bot) runCRAPILoop(id int, client *CRAPIClient) {
+	logger.L.Info("starting CR API loop", "client_id", id, "url", client.url)
 
 	for {
-		b.pollCRAPI()
+		b.pollCRAPI(id, client)
 		// 16s base + 0-4s jitter (matching legacy behavior)
 		jitter := time.Duration(rand.Intn(4000)) * time.Millisecond
 		wait := 16*time.Second + jitter
-		logger.L.Debug("CR API waiting", "duration", wait.String())
+		logger.L.Debug("CR API waiting", "client_id", id, "duration", wait.String())
 		time.Sleep(wait)
 	}
 }
 
-func (b *Bot) pollCRAPI() {
-	results, err := b.crapiClient.FetchSMS()
+func (b *Bot) pollCRAPI(id int, client *CRAPIClient) {
+	results, err := client.FetchSMS()
 	if err != nil {
-		logger.L.Error("CR API fetch failed", "err", err)
+		logger.L.Error("CR API fetch failed", "client_id", id, "err", err)
 		return
 	}
 
 	if len(results) == 0 {
-		logger.L.Debug("CR API found no messages")
 		return
 	}
 

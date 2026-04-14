@@ -37,7 +37,7 @@ type Bot struct {
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
 	scrapers     []*Scraper
-	crapiClient  *CRAPIClient
+	crapiClients []*CRAPIClient
 	redisClient  *redis.Client
 	activeCache  *ActiveNumberCache
 	verifyCache  *VerificationCache
@@ -67,7 +67,7 @@ func New(
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
 	scrapers []*Scraper,
-	crapiClient *CRAPIClient,
+	crapiClients []*CRAPIClient,
 	redisClient *redis.Client,
 	activeCache *ActiveNumberCache,
 	verifyCache *VerificationCache,
@@ -91,7 +91,7 @@ func New(
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
 		scrapers:     scrapers,
-		crapiClient:  crapiClient,
+		crapiClients:  crapiClients,
 		redisClient:  redisClient,
 		activeCache:  activeCache,
 		verifyCache:  verifyCache,
@@ -116,6 +116,7 @@ func (b *Bot) Start() {
 		log.Info("cleared webhook before polling")
 	}
 	log.Info("bot started in polling mode", "username", b.api.Self.UserName)
+	b.setBotCommands()
 
 	if otpWorkerEnabled {
 		b.seedActiveCacheFromDB()
@@ -137,6 +138,7 @@ func (b *Bot) Start() {
 func (b *Bot) StartWebhook(webhookURL string, port int) {
 	b.api.Debug = false
 	log.Info("bot starting in webhook mode", "username", b.api.Self.UserName, "url", webhookURL, "port", port)
+	b.setBotCommands()
 
 	if otpWorkerEnabled {
 		b.seedActiveCacheFromDB()
@@ -242,6 +244,20 @@ func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
 	case "Get a Phone Number ☎️":
 		b.handleGetNumber(msg)
 	case "📊 My Status":
-		b.handleMyStatus(msg)
+		b.handleSeeStatus(msg)
+	}
+}
+
+func (b *Bot) setBotCommands() {
+	commands := []tgbotapi.BotCommand{
+		{Command: "start", Description: "🚀 Start the Bot"},
+		{Command: "getnumber", Description: "☎️ Get a Phone Number"},
+		{Command: "seestatus", Description: "📊 My Status"},
+	}
+	config := tgbotapi.NewSetMyCommands(commands...)
+	if _, err := b.api.Request(config); err != nil {
+		log.Error("failed to set bot commands", "err", err)
+	} else {
+		log.Info("bot commands set successfully")
 	}
 }

@@ -172,16 +172,21 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		}
 	}
 
-	numbers, err := b.numberSvc.GetNumbers(platform, country, userIDStr, excludeNums, 1)
+	// Fetch up to 3 numbers
+	numbers, err := b.numberSvc.GetNumbers(platform, country, userIDStr, excludeNums, 3)
 	if err != nil || len(numbers) == 0 {
 		b.safeEdit(chatID, msgID,
-			fmt.Sprintf("<b>No number available</b>\n%s • %s", platform, country),
+			fmt.Sprintf("<b>❌ No number available</b>\n%s • %s", platform, country),
 			nil,
 		)
 		return
 	}
 
-	for _, num := range numbers {
+	var rows [][]CustomButton
+	var copyRow []CustomButton
+
+	numbersText := ""
+	for i, num := range numbers {
 		an := activenumber.ActiveNumber{
 			Number:    num,
 			UserID:    userIDStr,
@@ -195,49 +200,64 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 			_ = b.activeCache.Set(context.Background(), an)
 		}
 		_ = b.seenSvc.Add(userIDStr, num, country)
+
+		// Add number to text (monospaced)
+		numbersText += fmt.Sprintf("📱 <b>#%d:</b> <code>%s</code>\n", i+1, num)
+
+		// Add to copy row
+		copyRow = append(copyRow, CustomButton{
+			Text:     fmt.Sprintf("📋 #%d", i+1),
+			CopyText: &CopyTextButton{Text: num},
+		})
+	}
+	
+	// Add the grid of copy buttons
+	if len(copyRow) > 0 {
+		rows = append(rows, copyRow)
 	}
 
 	_ = b.activeSvc.UpdateMessageID(userIDStr, int64(msgID))
 
-	number := numbers[0]
-
 	text := fmt.Sprintf(
-		`<tg-emoji emoji-id="5469931148295547357">✅</tg-emoji><b> Number assigned successfully</b>
-
-<b>Assigned Number</b>: <code>%s</code>
-
-<b>Platform:</b> %s
-<b>Country:</b> %s
-
-<i>Waiting for OTP...</i>`,
-		number, platform, country,
+		"<b>✅ %s - %s</b>\n"+
+			"────────────────────────\n"+
+			"%s\n"+
+			"<i>⏳ Waiting for OTP... (Auto-expiry: 1h)</i>",
+		platform, country, numbersText,
 	)
 
-	markup := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				"🔄 Change",
-				fmt.Sprintf("change_number::%s::%s", platform, country),
-			),
-			tgbotapi.NewInlineKeyboardButtonData(
-				"⬅ Back",
-				fmt.Sprintf("back_to_countries::%s", platform),
-			),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(
-				"📢 OTP Group",
-				"https://t.me/shark_sms_panel",
-			),
-			tgbotapi.NewInlineKeyboardButtonURL(
-				"📺 Guide",
-				"https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
-			),
-		),
-	)
+	// Add navigation buttons
+	rows = append(rows, []CustomButton{
+		{
+			Text:         "🔄 Change (10s CD)",
+			CallbackData: fmt.Sprintf("change_number::%s::%s", platform, country),
+		},
+		{
+			Text:         "⬅ Back",
+			CallbackData: fmt.Sprintf("back_to_countries::%s", platform),
+		},
+	})
+	rows = append(rows, []CustomButton{
+		{
+			Text: "📢 OTP Group",
+			URL:  "https://t.me/shark_sms_panel",
+		},
+		{
+			Text: "📺 Guide",
+			URL:  "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+		},
+	})
 
-	b.safeEdit(chatID, msgID, text, &markup)
+	markup := CustomMarkup{InlineKeyboard: rows}
+
+	// Because tgbotapi.EditMessageTextConfig expects an InlineKeyboardMarkup, 
+	// and our CustomMarkup is a raw struct with JSON tags, we need to send it 
+	// via a manual request if we want to use 'copy_text'. 
+	// For now, I'll use a helper to send it.
+
+	b.sendHTMLCustom(chatID, msgID, text, markup)
 }
+
 
 // handleMyStatus shows the user's OTP usage stats
 func (b *Bot) handleMyStatus(msg *tgbotapi.Message) {

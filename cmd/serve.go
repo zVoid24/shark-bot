@@ -97,9 +97,11 @@ func Serve() {
 		)
 	}
 
-	// 5.6 Initialize CR API Client and Scrapers (scrapers kept for compatibility but empty)
-	var scrapers []*bot.Scraper
-	crapiClient := bot.NewCRAPIClient(cnf.CRAPI.URL, cnf.CRAPI.Token)
+	// 5.6 Initialize CR API Clients
+	var crapiClients []*bot.CRAPIClient
+	for _, acc := range cnf.CRAPI.Accounts {
+		crapiClients = append(crapiClients, bot.NewCRAPIClient(acc.URL, acc.Token))
+	}
 
 	// 6. Seed initial owner IDs as admins
 	if err := adminSvc.SeedOwners(cnf.Telegram.OwnerIDs); err != nil {
@@ -124,8 +126,8 @@ func Serve() {
 		statsSvc,
 		seenSvc,
 		processedSvc,
-		scrapers,
-		crapiClient,
+		[]*bot.Scraper{},
+		crapiClients,
 		redisClient,
 		activeCache,
 		verCache,

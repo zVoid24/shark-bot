@@ -1,10 +1,32 @@
 package bot
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
 	"shark_bot/pkg/logger"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+
+// Custom button types to support copy_text which is missing in the tgbotapi library
+type CopyTextButton struct {
+	Text string `json:"text"`
+}
+
+type CustomButton struct {
+	Text          string          `json:"text"`
+	CallbackData  string          `json:"callback_data,omitempty"`
+	URL           string          `json:"url,omitempty"`
+	CopyText      *CopyTextButton `json:"copy_text,omitempty"`
+	CustomEmojiID string          `json:"icon_custom_emoji_id,omitempty"`
+}
+
+type CustomMarkup struct {
+	InlineKeyboard [][]CustomButton `json:"inline_keyboard"`
+}
 
 var botLog = logger.New("bot")
 
@@ -83,3 +105,35 @@ func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("📊 My Status")),
 	)
 }
+
+// sendHTMLCustom sends an HTML message with custom JSON markup (for copy_text support)
+// This uses a direct HTTP call to bypass library limitations on custom button types.
+func (b *Bot) sendHTMLCustom(chatID int64, msgID int, text string, markup CustomMarkup) {
+	method := "sendMessage"
+	params := url.Values{}
+	params.Set("chat_id", fmt.Sprintf("%d", chatID))
+	params.Set("text", text)
+	params.Set("parse_mode", "HTML")
+	params.Set("disable_web_page_preview", "true")
+
+	if msgID != 0 {
+		method = "editMessageText"
+		params.Set("message_id", fmt.Sprintf("%d", msgID))
+	}
+
+	markupBytes, _ := json.Marshal(markup)
+	params.Set("reply_markup", string(markupBytes))
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/%s", b.api.Token, method)
+	resp, err := http.PostForm(apiURL, params)
+	if err != nil {
+		botLog.Error("direct API request failed", "method", method, "err", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		botLog.Error("direct API request non-OK", "method", method, "status", resp.Status)
+	}
+}
+

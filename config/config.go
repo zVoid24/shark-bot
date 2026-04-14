@@ -49,9 +49,13 @@ type ScraperConfig struct {
 	Accounts []ScraperAccount
 }
 
-type CRAPIConfig struct {
+type CRAPIAccount struct {
 	URL   string
 	Token string
+}
+
+type CRAPIConfig struct {
+	Accounts []CRAPIAccount
 }
 
 type RedisConfig struct {
@@ -166,6 +170,25 @@ func parseScraperAccounts(raw string) []ScraperAccount {
 	return accounts
 }
 
+func parseCRAPIAccounts(raw string) []CRAPIAccount {
+	var accounts []CRAPIAccount
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		// Use | because URLs contain :
+		parts := strings.SplitN(s, "|", 2)
+		if len(parts) == 2 {
+			accounts = append(accounts, CRAPIAccount{
+				URL:   parts[0],
+				Token: parts[1],
+			})
+		}
+	}
+	return accounts
+}
+
 func Load() *Config {
 	if cfg != nil {
 		return cfg
@@ -227,9 +250,18 @@ func Load() *Config {
 	}
 
 	// --- CR API ---
+	crapiAccounts := parseCRAPIAccounts(os.Getenv("CR_API_ACCOUNTS"))
+	// Fallback to legacy single account
+	if len(crapiAccounts) == 0 {
+		url := os.Getenv("CR_API_URL")
+		tok := os.Getenv("CR_API_TOKEN")
+		if url != "" && tok != "" {
+			crapiAccounts = append(crapiAccounts, CRAPIAccount{URL: url, Token: tok})
+		}
+	}
+
 	crapi := CRAPIConfig{
-		URL:   getDefault("CR_API_URL", "http://147.135.212.197/crapi/had/viewstats"),
-		Token: os.Getenv("CR_API_TOKEN"),
+		Accounts: crapiAccounts,
 	}
 
 	// --- Redis ---
