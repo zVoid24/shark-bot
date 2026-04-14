@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"regexp"
 	"shark_bot/pkg/logger"
+	"strconv"
 	"strings"
 	"time"
 
 	"math/rand"
 	"shark_bot/internal/activenumber"
+	"shark_bot/internal/earnings"
 	"shark_bot/internal/processednumber"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -256,9 +258,29 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	var userChatID int64
 	fmt.Sscanf(foundUserID, "%d", &userChatID)
 	if userChatID != 0 {
+		// Calculate payout
+		priceStr, _ := b.settingsSvc.Get("otp_price")
+		price := 0.0
+		if priceStr != "" {
+			fmt.Sscanf(priceStr, "%f", &price)
+		}
+
+		creditMsg := ""
+		if !matched.PayoutDone && price > 0 {
+			_ = b.userSvc.AddBalance(foundUserID, price)
+			_ = b.earningsSvc.Add(earnings.Earning{
+				UserID:    foundUserID,
+				Amount:    price,
+				Source:    fmt.Sprintf("OTP: %s (%s)", fullNumber, service),
+				Timestamp: time.Now(),
+			})
+			_ = b.activeSvc.MarkPayoutDone(matched.Number, matched.Platform)
+			creditMsg = fmt.Sprintf("\n💰 <b>Balance Credited:</b> <code>$%s</code>", strconv.FormatFloat(price, 'f', -1, 64))
+		}
+
 		otpMsg := tgbotapi.NewMessage(userChatID,
-			fmt.Sprintf("<b>✅ OTP Received for</b> <code>%s</code>\n\n<b>🔑 Your %s Code:</b> <code>%s</code>",
-				fullNumber, service, otp))
+			fmt.Sprintf("<b>✅ OTP Received for</b> <code>%s</code>\n\n<b>🔑 Your %s Code:</b> <code>%s</code>%s",
+				fullNumber, service, otp, creditMsg))
 		otpMsg.ParseMode = tgbotapi.ModeHTML
 		// Custom button types to support copy_text
 		type CopyTextButton struct {

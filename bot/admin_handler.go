@@ -26,6 +26,8 @@ const adminHelp = `<b>--- Admin Command Panel ---</b>
 <code>/numberremove [Plat] [Coun] [on/off]</code> - Set delete policy on change.
 
 <b><u>Configuration</u></b>
+<code>/setotpprice [amount]</code> - Set global OTP price.
+<code>/setminwithdraw [amount]</code> - Set minimum withdrawal.
 <code>/cancel</code> - Cancel the current operation.
 
 <b><u>User Management</u></b>
@@ -351,4 +353,40 @@ func (b *Bot) handleToggleRemovePolicy(msg *tgbotapi.Message) {
 	plat, coun, status := parts[0], parts[1], parts[2]
 	_ = b.settingsSvc.SetRemovePolicy(plat, coun, status)
 	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>✅ Configuration Updated!</b>\n\n<b>Platform:</b> %s\n<b>Country:</b> %s\n<b>Remove on Change:</b> %s", plat, coun, strings.ToUpper(status)))
+}
+
+func (b *Bot) handleSetOTPPrice(msg *tgbotapi.Message) {
+	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
+		return
+	}
+	args := strings.Fields(msg.CommandArguments())
+	if len(args) == 0 {
+		b.sendHTML(msg.Chat.ID, "<b>Usage: /setotpprice [amount]</b>")
+		return
+	}
+	price, err := strconv.ParseFloat(args[0], 64)
+	if err != nil {
+		b.sendHTML(msg.Chat.ID, "<b>Invalid amount.</b>")
+		return
+	}
+	_ = b.settingsSvc.Set("otp_price", args[0])
+	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>✅ OTP Price set to: $%s</b>", strconv.FormatFloat(price, 'f', -1, 64)))
+}
+
+func (b *Bot) handleSetMinWithdraw(msg *tgbotapi.Message) {
+	if !b.isAdmin(fmt.Sprintf("%d", msg.From.ID)) {
+		return
+	}
+	args := strings.Fields(msg.CommandArguments())
+	if len(args) == 0 {
+		b.sendHTML(msg.Chat.ID, "<b>Usage: /setminwithdraw [amount]</b>")
+		return
+	}
+	amount, err := strconv.ParseFloat(args[0], 64)
+	if err != nil {
+		b.sendHTML(msg.Chat.ID, "<b>Invalid amount.</b>")
+		return
+	}
+	_ = b.settingsSvc.Set("min_withdraw", args[0])
+	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>✅ Minimum Withdrawal set to: $%s</b>", strconv.FormatFloat(amount, 'f', -1, 64)))
 }

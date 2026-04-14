@@ -46,3 +46,7 @@ func (s *Service) DeleteAll() error {
 func (s *Service) CleanupExpired(ttl time.Duration) error {
 	return s.repo.CleanupExpired(ttl)
 }
+
+func (s *Service) MarkPayoutDone(number, platform string) error {
+	return s.repo.MarkPayoutDone(number, platform)
+}

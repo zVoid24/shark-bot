@@ -13,4 +13,5 @@ type Repository interface {
 	UpdateMessageID(userID string, msgID int64) error
 	DeleteAll() error
 	CleanupExpired(ttl time.Duration) error
+	MarkPayoutDone(number, platform string) error
 }

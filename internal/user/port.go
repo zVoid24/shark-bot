@@ -11,4 +11,6 @@ type Repository interface {
 	GetBlockedUsers() ([]string, error)
 	GetUnblockedUserIDs() ([]string, error)
 	GetUser(userID string) (*User, error)
+	AddBalance(userID string, amount float64) error
+	DeductBalance(userID string, amount float64) error
 }

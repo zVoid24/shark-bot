@@ -43,6 +43,10 @@ func (b *Bot) handleCommand(msg *tgbotapi.Message) {
 		b.handleRemoveNumber(msg)
 	case "cancel":
 		b.handleCancel(msg)
+	case "setotpprice":
+		b.handleSetOTPPrice(msg)
+	case "setminwithdraw":
+		b.handleSetMinWithdraw(msg)
 	case "getnumber":
 		b.handleGetNumber(msg)
 	}

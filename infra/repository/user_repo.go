@@ -71,9 +71,19 @@ func (r *UserRepo) GetUnblockedUserIDs() ([]string, error) {
 
 func (r *UserRepo) GetUser(userID string) (*user.User, error) {
 	var u user.User
-	err := r.db.Get(&u, "SELECT user_id, full_name, is_blocked FROM users WHERE user_id = $1", userID)
+	err := r.db.Get(&u, "SELECT user_id, full_name, is_blocked, balance FROM users WHERE user_id = $1", userID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return &u, err
+}
+
+func (r *UserRepo) AddBalance(userID string, amount float64) error {
+	_, err := r.db.Exec("UPDATE users SET balance = balance + $1 WHERE user_id = $2", amount, userID)
+	return err
+}
+
+func (r *UserRepo) DeductBalance(userID string, amount float64) error {
+	_, err := r.db.Exec("UPDATE users SET balance = balance - $1 WHERE user_id = $2", amount, userID)
+	return err
 }

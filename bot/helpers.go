@@ -80,6 +80,10 @@ func (b *Bot) answerCallback(callbackID, text string, showAlert bool) {
 func mainKeyboard() tgbotapi.ReplyKeyboardMarkup {
 	return tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Get a Phone Number ☎️")),
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Wallet 💰"),
+			tgbotapi.NewKeyboardButton("Withdraw 💸"),
+		),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("📊 My Status")),
 	)
 }

@@ -19,22 +19,22 @@ func NewActiveNumberRepo(db *sqlx.DB) *ActiveNumberRepo {
 }
 
 func (r *ActiveNumberRepo) Insert(an activenumber.ActiveNumber) error {
-	_, err := r.db.Exec(`INSERT INTO active_numbers (number, user_id, timestamp, message_id, platform, country)
-		VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (number, platform) DO NOTHING`,
-		an.Number, an.UserID, an.Timestamp, an.MessageID, an.Platform, an.Country)
+	_, err := r.db.Exec(`INSERT INTO active_numbers (number, user_id, timestamp, message_id, platform, country, payout_done)
+		VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (number, platform) DO NOTHING`,
+		an.Number, an.UserID, an.Timestamp, an.MessageID, an.Platform, an.Country, an.PayoutDone)
 	return err
 }
 
 func (r *ActiveNumberRepo) GetByUser(userID string) ([]activenumber.ActiveNumber, error) {
 	var ans []activenumber.ActiveNumber
-	err := r.db.Select(&ans, `SELECT number, user_id, timestamp, message_id, platform, country
+	err := r.db.Select(&ans, `SELECT number, user_id, timestamp, message_id, platform, country, payout_done
 		FROM active_numbers WHERE user_id = $1`, userID)
 	return ans, err
 }
 
 func (r *ActiveNumberRepo) GetByNumber(number, platform string) (*activenumber.ActiveNumber, error) {
 	var an activenumber.ActiveNumber
-	err := r.db.Get(&an, `SELECT number, user_id, timestamp, message_id, platform, country
+	err := r.db.Get(&an, `SELECT number, user_id, timestamp, message_id, platform, country, payout_done
 		FROM active_numbers WHERE number = $1 AND platform = $2`, number, platform)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -44,7 +44,7 @@ func (r *ActiveNumberRepo) GetByNumber(number, platform string) (*activenumber.A
 
 func (r *ActiveNumberRepo) GetAll() ([]activenumber.ActiveNumber, error) {
 	var ans []activenumber.ActiveNumber
-	err := r.db.Select(&ans, `SELECT number, user_id, timestamp, message_id, platform, country FROM active_numbers`)
+	err := r.db.Select(&ans, `SELECT number, user_id, timestamp, message_id, platform, country, payout_done FROM active_numbers`)
 	return ans, err
 }
 
@@ -71,5 +71,10 @@ func (r *ActiveNumberRepo) DeleteAll() error {
 func (r *ActiveNumberRepo) CleanupExpired(ttl time.Duration) error {
 	cutoff := time.Now().Add(-ttl)
 	_, err := r.db.Exec("DELETE FROM active_numbers WHERE timestamp < $1", cutoff)
+	return err
+}
+
+func (r *ActiveNumberRepo) MarkPayoutDone(number, platform string) error {
+	_, err := r.db.Exec("UPDATE active_numbers SET payout_done = TRUE WHERE number = $1 AND platform = $2", number, platform)
 	return err
 }

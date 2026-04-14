@@ -7,6 +7,7 @@ import (
 	"shark_bot/infra/repository"
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
+	"shark_bot/internal/earnings"
 	"shark_bot/internal/number"
 	"shark_bot/internal/processednumber"
 	"shark_bot/internal/seennumber"
@@ -52,6 +53,7 @@ func Serve() {
 	statsRepo := repository.NewStatsRepo(dbConn)
 	seenRepo := repository.NewSeenNumberRepo(dbConn)
 	processedRepo := repository.NewProcessedNumberRepo(dbConn)
+	earningsRepo := repository.NewEarningsRepo(dbConn)
 
 	// 5. Wrap repos in domain services (application layer)
 	userSvc := user.NewService(userRepo)
@@ -62,6 +64,7 @@ func Serve() {
 	statsSvc := stats.NewService(statsRepo)
 	seenSvc := seennumber.NewService(seenRepo)
 	processedSvc := processednumber.NewService(processedRepo)
+	earningsSvc := earnings.NewService(earningsRepo)
 
 	// 5.2 Initialize Redis and active-number cache (optional fallback to DB if unavailable)
 	var redisClient *redis.Client
@@ -124,6 +127,7 @@ func Serve() {
 		statsSvc,
 		seenSvc,
 		processedSvc,
+		earningsSvc,
 		scrapers,
 		crapiClient,
 		redisClient,

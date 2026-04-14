@@ -8,6 +8,7 @@ import (
 	"time"
 	"shark_bot/internal/activenumber"
 	"shark_bot/internal/admin"
+	"shark_bot/internal/earnings"
 	"shark_bot/internal/number"
 	"shark_bot/internal/processednumber"
 	"shark_bot/internal/seennumber"
@@ -36,6 +37,7 @@ type Bot struct {
 	statsSvc     *stats.Service
 	seenSvc      *seennumber.Service
 	processedSvc *processednumber.Service
+	earningsSvc  *earnings.Service
 	scrapers     []*Scraper
 	crapiClient  *CRAPIClient
 	redisClient  *redis.Client
@@ -66,6 +68,7 @@ func New(
 	statsSvc *stats.Service,
 	seenSvc *seennumber.Service,
 	processedSvc *processednumber.Service,
+	earningsSvc *earnings.Service,
 	scrapers []*Scraper,
 	crapiClient *CRAPIClient,
 	redisClient *redis.Client,
@@ -90,6 +93,7 @@ func New(
 		statsSvc:     statsSvc,
 		seenSvc:      seenSvc,
 		processedSvc: processedSvc,
+		earningsSvc:  earningsSvc,
 		scrapers:     scrapers,
 		crapiClient:  crapiClient,
 		redisClient:  redisClient,
@@ -120,6 +124,7 @@ func (b *Bot) Start() {
 	if otpWorkerEnabled {
 		b.seedActiveCacheFromDB()
 		go b.otpWorker()
+		go b.cleanupWorker()
 	} else {
 		log.Info("OTP worker disabled")
 	}
@@ -130,6 +135,21 @@ func (b *Bot) Start() {
 
 	for update := range updates {
 		go b.handleUpdate(update)
+	}
+}
+
+func (b *Bot) cleanupWorker() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	log.Info("cleanup worker started (1h expiry)")
+
+	for range ticker.C {
+		err := b.activeSvc.CleanupExpired(1 * time.Hour)
+		if err != nil {
+			log.Error("cleanup worker failed", "err", err)
+		} else {
+			log.Debug("cleanup worker ran successfully")
+		}
 	}
 }
 
@@ -243,5 +263,9 @@ func (b *Bot) handlePrivateMessage(msg *tgbotapi.Message) {
 		b.handleGetNumber(msg)
 	case "📊 My Status":
 		b.handleMyStatus(msg)
+	case "Wallet 💰":
+		b.handleWallet(msg)
+	case "Withdraw 💸":
+		b.handleWithdrawStart(msg)
 	}
 }

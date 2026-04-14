@@ -44,3 +44,11 @@ func (s *Service) GetUnblockedUserIDs() ([]string, error) {
 func (s *Service) GetUser(userID string) (*User, error) {
 	return s.repo.GetUser(userID)
 }
+
+func (s *Service) AddBalance(userID string, amount float64) error {
+	return s.repo.AddBalance(userID, amount)
+}
+
+func (s *Service) DeductBalance(userID string, amount float64) error {
+	return s.repo.DeductBalance(userID, amount)
+}

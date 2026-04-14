@@ -18,6 +18,7 @@ const (
 	convStepAwaitFile      = 6
 	convStepRemovePlat     = 7
 	convStepRemoveCountry  = 8
+	convStepAwaitBinanceID = 9
 )
 
 type convContext struct {
@@ -117,6 +118,46 @@ func (b *Bot) handleConversationText(msg *tgbotapi.Message) bool {
 		m.ParseMode = tgbotapi.ModeHTML
 		m.ReplyMarkup = kb
 		b.api.Send(m)
+		return true
+
+	// --- Withdrawal: Await Binance ID ---
+	case convStepAwaitBinanceID:
+		binanceID := strings.TrimSpace(msg.Text)
+		if binanceID == "" {
+			b.sendHTML(msg.Chat.ID, "<b>Invalid Binance ID. Please try again or /cancel.</b>")
+			return true
+		}
+
+		userID := fmt.Sprintf("%d", msg.From.ID)
+		u, _ := b.userSvc.GetUser(userID)
+		balance := 0.0
+		if u != nil {
+			balance = u.Balance
+		}
+
+		// Notify admins
+		admins, _ := b.adminSvc.GetAll()
+		fullName := msg.From.FirstName
+		if msg.From.LastName != "" {
+			fullName += " " + msg.From.LastName
+		}
+		adminNotif := fmt.Sprintf(
+			"<b>💰 NEW WITHDRAWAL REQUEST</b>\n\n<b>User:</b> %s (<code>%s</code>)\n<b>Amount:</b> <code>$%0.2f</code>\n<b>Binance ID:</b> <code>%s</code>",
+			fullName, userID, balance, binanceID)
+
+		for _, adminIDStr := range admins {
+			var adminChatID int64
+			fmt.Sscanf(adminIDStr, "%d", &adminChatID)
+			if adminChatID != 0 {
+				b.sendHTML(adminChatID, adminNotif)
+			}
+		}
+
+		// Deduct balance
+		_ = b.userSvc.DeductBalance(userID, balance)
+
+		b.setConvState(msg.From.ID, nil)
+		b.sendWithReplyKeyboard(msg.Chat.ID, fmt.Sprintf("<b>✅ Withdrawal Request Sent!</b>\n\nYour request for <code>$%0.2f</code> to Binance ID <code>%s</code> has been sent to admins for processing.", balance, binanceID), mainKeyboard())
 		return true
 	}
 
