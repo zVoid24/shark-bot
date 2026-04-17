@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"shark_bot/pkg/logger"
 	"strings"
+	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+var verificationDisabledWarnOnce sync.Once
 
 // verificationKeyboard returns the verification inline keyboard with join buttons
 func (b *Bot) verificationKeyboard() tgbotapi.InlineKeyboardMarkup {
@@ -45,6 +48,13 @@ Join all three groups using the buttons below, then click "Check Verification" t
 // isUserVerified checks if a user has joined both required groups
 func (b *Bot) isUserVerified(userID int64) bool {
 	ctx := context.Background()
+	if !b.verificationEnabled() {
+		verificationDisabledWarnOnce.Do(func() {
+			logger.L.Warn("verification disabled: no VERIFY_GROUP_* configured; all users will be treated as verified")
+		})
+		return true
+	}
+
 	// 1. Check cache first
 	if b.verifyCache != nil && b.verifyCache.IsVerified(ctx, userID) {
 		return true
@@ -61,6 +71,17 @@ func (b *Bot) isUserVerified(userID int64) bool {
 	}
 
 	return isVerified
+}
+
+func (b *Bot) verificationEnabled() bool {
+	groups := []string{b.verifyGroup1, b.verifyGroup2, b.verifyGroup3}
+	for _, group := range groups {
+		g := strings.TrimSpace(group)
+		if g != "" && g != "0" {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *Bot) performMembershipChecks(userID int64) bool {
