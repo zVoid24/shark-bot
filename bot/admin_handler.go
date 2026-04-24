@@ -330,8 +330,8 @@ func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
 					if strings.Contains(errStr, "connection reset") ||
 						strings.Contains(errStr, "timeout") ||
 						strings.Contains(errStr, "eof") {
-						log.Warn("network issue detected; pausing worker for 1s", "err", err)
-						time.Sleep(1 * time.Second)
+						log.Warn("network issue detected; pausing worker for 5s", "err", err)
+						time.Sleep(5 * time.Second)
 					}
 					mu.Unlock()
 					break // move on to next user

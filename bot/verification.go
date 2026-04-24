@@ -55,18 +55,28 @@ func (b *Bot) isUserVerified(userID int64) bool {
 		return true
 	}
 
-	// 1. Check cache first
-	if b.verifyCache != nil && b.verifyCache.IsVerified(ctx, userID) {
-		return true
+	// 1. Check cache first (positive and negative)
+	if b.verifyCache != nil {
+		if b.verifyCache.IsVerified(ctx, userID) {
+			return true
+		}
+		if b.verifyCache.IsUnverifiedRecently(ctx, userID) {
+			return false
+		}
 	}
 
 	// 2. Perform membership checks via Telegram API
 	isVerified := b.performMembershipChecks(userID)
 
-	// 3. Cache the result if verified
-	if isVerified && b.verifyCache != nil {
-		if err := b.verifyCache.SetVerified(ctx, userID); err != nil {
-			logger.L.Warn("failed to cache verification status", "user_id", userID, "err", err)
+	// 3. Cache the result
+	if b.verifyCache != nil {
+		if isVerified {
+			if err := b.verifyCache.SetVerified(ctx, userID); err != nil {
+				logger.L.Warn("failed to cache verification status", "user_id", userID, "err", err)
+			}
+		} else {
+			// Negative cache: remember they failed for a short while to prevent spamming GetChatMember
+			b.verifyCache.SetUnverified(ctx, userID)
 		}
 	}
 

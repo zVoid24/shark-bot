@@ -140,7 +140,16 @@ func (b *Bot) sendHTMLCustom(chatID int64, msgID int, text string, markup Custom
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		botLog.Error("direct API request non-OK", "method", method, "status", resp.Status)
+		var tgErr struct {
+			Description string `json:"description"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&tgErr)
+
+		if strings.Contains(strings.ToLower(tgErr.Description), "message is not modified") {
+			return // ignore, expected when user clicks same button
+		}
+
+		botLog.Error("direct API request non-OK", "method", method, "status", resp.Status, "desc", tgErr.Description)
 	}
 }
 

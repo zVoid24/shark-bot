@@ -112,13 +112,13 @@ func Serve() {
 	// 7. Connect to Telegram with a tuned HTTP client
 	httpClient := &http.Client{
 		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 100,
-			MaxConnsPerHost:     100,
+			MaxIdleConns:        200,
+			MaxIdleConnsPerHost: 200,
+			MaxConnsPerHost:     200,
 			IdleConnTimeout:     90 * time.Second,
 			TLSHandshakeTimeout: 10 * time.Second,
 		},
-		Timeout: 60 * time.Second,
+		Timeout: 100 * time.Second,
 	}
 	api, err := tgbotapi.NewBotAPIWithClient(cnf.Telegram.BotToken, tgbotapi.APIEndpoint, httpClient)
 	if err != nil {
