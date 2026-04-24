@@ -56,35 +56,43 @@ func (b *Bot) showPlatformList(chatID int64, msgID int, isEdit bool, userID stri
 		return nil
 	}
 
-	var rows [][]tgbotapi.InlineKeyboardButton
+	var rows [][]CustomButton
 
 	for _, p := range platforms {
-		label := p
+		label := capitalize(p)
+		emojiID := GetPlatformEmojiID(p)
+
 		if isAdmin {
 			count, err := b.numberSvc.CountAvailable(p, "")
 			if err == nil {
-				label = fmt.Sprintf("%s (%d)", p, count)
+				label = fmt.Sprintf("%s (%d)", label, count)
 			}
 		}
 
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				label,
-				"select_platform::"+p,
-			),
-		))
+		rows = append(rows, []CustomButton{
+			{
+				Text:          label,
+				CallbackData:  "select_platform::" + p,
+				CustomEmojiID: emojiID,
+			},
+		})
 	}
 
-	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	markup := CustomMarkup{InlineKeyboard: rows}
 
 	// ✅ Wider looking message
-	text := "<b>Select platform</b>\nChoose a service below to continue."
-
-	if isEdit {
-		b.safeEdit(chatID, msgID, text, &markup)
-	} else {
-		b.sendHTMLWithMarkup(chatID, text, markup)
+	text := fmt.Sprintf("<b>%s</b>\nChoose a service below to continue.", capitalize("platform selection"))
+	if isAdmin {
+		text = "<b>Select platform (Admin View)</b>\nChoose a service below to continue."
 	}
+
+	// If not an edit, we MUST send a new message (msgID=0 for sendHTMLCustom)
+	targetMsgID := msgID
+	if !isEdit {
+		targetMsgID = 0
+	}
+
+	b.sendHTMLCustom(chatID, targetMsgID, text, markup)
 
 	return nil
 }
@@ -99,40 +107,61 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform, userID string) 
 
 	isAdmin := b.isAdmin(userID)
 
-	var buttons []tgbotapi.InlineKeyboardButton
+	var rows [][]CustomButton
 
 	for _, c := range countries {
 		label := c
+		emojiID := GetFlagEmojiIDByName(c)
+
+		if emojiID == "" {
+			label = GetFlagEmojiByName(c) + " " + c
+		}
+
 		if isAdmin {
 			count, err := b.numberSvc.CountAvailable(platform, c)
 			if err == nil {
-				label = fmt.Sprintf("%s (%d)", c, count)
+				label = fmt.Sprintf("%s (%d)", label, count)
 			}
 		}
 
-		buttons = append(buttons,
-			tgbotapi.NewInlineKeyboardButtonData(
-				label,
-				fmt.Sprintf("select_country::%s::%s", platform, c),
-			),
-		)
+		rows = append(rows, []CustomButton{
+			{
+				Text:          label,
+				CallbackData:  fmt.Sprintf("select_country::%s::%s", platform, c),
+				CustomEmojiID: emojiID,
+			},
+		})
 	}
 
-	rows := buildButtonRows(buttons, 2)
+	// Group buttons into 2 per row
+	var groupedRows [][]CustomButton
+	for i := 0; i < len(rows); i += 2 {
+		end := i + 2
+		if end > len(rows) {
+			end = len(rows)
+		}
+		var row []CustomButton
+		for j := i; j < end; j++ {
+			row = append(row, rows[j][0])
+		}
+		groupedRows = append(groupedRows, row)
+	}
 
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("⬅ Back", "back_to_platforms"),
-	))
+	groupedRows = append(groupedRows, []CustomButton{
+		{
+			Text:         "⬅ Back",
+			CallbackData: "back_to_platforms",
+		},
+	})
 
-	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	markup := CustomMarkup{InlineKeyboard: groupedRows}
 
-	// ✅ Make message feel wider
 	text := fmt.Sprintf(
 		"<b>%s</b>\nSelect a country to continue.",
-		platform,
+		capitalize(platform),
 	)
 
-	b.safeEdit(chatID, msgID, text, &markup)
+	b.sendHTMLCustom(chatID, msgID, text, markup)
 }
 
 // assignNumbers picks numbers and assigns them to the user
@@ -146,7 +175,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
 			excludeNums = append(excludeNums, a.Number)
-			_ = b.numberSvc.DeleteSpecific(a.Number, a.Platform, a.Country)
+			_ = b.numberSvc.UpdateLastUsed(a.Number, a.Platform, a.Country)
 			if b.activeCache != nil {
 				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number, a.Platform)
 			}
@@ -160,7 +189,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		// Delete any old numbers first
 		actives, _ := b.activeSvc.GetByUser(userIDStr)
 		for _, a := range actives {
-			_ = b.numberSvc.DeleteSpecific(a.Number, a.Platform, a.Country)
+			_ = b.numberSvc.UpdateLastUsed(a.Number, a.Platform, a.Country)
 			if b.activeCache != nil {
 				_ = b.activeCache.DeleteByNumber(context.Background(), a.Number, a.Platform)
 			}
@@ -206,11 +235,12 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 
 		// Add to copy row
 		copyRow = append(copyRow, CustomButton{
-			Text:     fmt.Sprintf("📋 #%d", i+1),
-			CopyText: &CopyTextButton{Text: num},
+			Text:          fmt.Sprintf("#%d", i+1),
+			CopyText:      &CopyTextButton{Text: num},
+			CustomEmojiID: "6176966310920983412",
 		})
 	}
-	
+
 	// Add the grid of copy buttons
 	if len(copyRow) > 0 {
 		rows = append(rows, copyRow)
@@ -219,45 +249,48 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 	_ = b.activeSvc.UpdateMessageID(userIDStr, int64(msgID))
 
 	text := fmt.Sprintf(
-		"<b>✅ %s - %s</b>\n"+
+		"<b>%s %s - %s %s</b>\n"+
 			"────────────────────────\n"+
 			"%s\n"+
 			"<i>⏳ Waiting for OTP... (Auto-expiry: 1h)</i>",
-		platform, country, numbersText,
+		GetPlatformEmoji(platform), capitalize(platform), GetFlagByName(country), country, numbersText,
 	)
 
 	// Add navigation buttons
 	rows = append(rows, []CustomButton{
 		{
-			Text:         "🔄 Change (10s CD)",
-			CallbackData: fmt.Sprintf("change_number::%s::%s", platform, country),
+			Text:          "Change (10s CD)",
+			CallbackData:  fmt.Sprintf("change_number::%s::%s", platform, country),
+			CustomEmojiID: "5231197925178089666",
 		},
 		{
-			Text:         "⬅ Back",
-			CallbackData: fmt.Sprintf("back_to_countries::%s", platform),
+			Text:          "Back",
+			CallbackData:  fmt.Sprintf("back_to_countries::%s", platform),
+			CustomEmojiID: "5471949924658588235", // Telegram-style arrow
 		},
 	})
 	rows = append(rows, []CustomButton{
 		{
-			Text: "📢 OTP Group",
-			URL:  "https://t.me/shark_sms_panel",
+			Text:          "OTP Group",
+			URL:           "https://t.me/shark_sms_panel",
+			CustomEmojiID: "5330237710655306682", // Telegram logo
 		},
 		{
-			Text: "📺 Guide",
-			URL:  "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+			Text:          "Guide",
+			URL:           "https://youtube.com/@sharkmethod?si=q2WqPvrY4iK77avz",
+			CustomEmojiID: "5942902988564600402", // Method/Guide icon
 		},
 	})
 
 	markup := CustomMarkup{InlineKeyboard: rows}
 
-	// Because tgbotapi.EditMessageTextConfig expects an InlineKeyboardMarkup, 
-	// and our CustomMarkup is a raw struct with JSON tags, we need to send it 
-	// via a manual request if we want to use 'copy_text'. 
+	// Because tgbotapi.EditMessageTextConfig expects an InlineKeyboardMarkup,
+	// and our CustomMarkup is a raw struct with JSON tags, we need to send it
+	// via a manual request if we want to use 'copy_text'.
 	// For now, I'll use a helper to send it.
 
 	b.sendHTMLCustom(chatID, msgID, text, markup)
 }
-
 
 // handleMyStatus shows the user's OTP usage stats
 func (b *Bot) handleMyStatus(msg *tgbotapi.Message) {

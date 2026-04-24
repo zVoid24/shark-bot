@@ -289,10 +289,10 @@ func (b *Bot) matchAndNotify(fullNumber, otp, service string) {
 	}
 
 	// Cleanup only. Reassignment is user-driven via the "Change Number" button.
-	if err := b.numberSvc.DeleteSpecific(matched.Number, matched.Platform, matched.Country); err != nil {
-		logger.L.Error("failed to delete matched number from pool", "number", matched.Number, "user_id", foundUserID, "err", err)
+	if err := b.numberSvc.UpdateLastUsed(matched.Number, matched.Platform, matched.Country); err != nil {
+		logger.L.Error("failed to update last used timestamp for matched number", "number", matched.Number, "user_id", foundUserID, "err", err)
 	} else {
-		logger.L.Debug("deleted matched number from pool", "number", matched.Number, "user_id", foundUserID)
+		logger.L.Debug("updated last used timestamp for matched number", "number", matched.Number, "user_id", foundUserID)
 	}
 	if err := b.activeSvc.DeleteByNumber(matched.Number, matched.Platform); err != nil {
 		logger.L.Error("failed to delete matched active number", "number", matched.Number, "user_id", foundUserID, "err", err)

@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"net/url"
 	"shark_bot/pkg/logger"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
-
 
 // Custom button types to support copy_text which is missing in the tgbotapi library
 type CopyTextButton struct {
@@ -137,3 +137,10 @@ func (b *Bot) sendHTMLCustom(chatID int64, msgID int, text string, markup Custom
 	}
 }
 
+// capitalize returns a string with the first letter in upper case
+func capitalize(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[0:1]) + strings.ToLower(s[1:])
+}

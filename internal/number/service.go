@@ -37,6 +37,10 @@ func (s *Service) DeleteSpecific(number, platform, country string) error {
 	return s.repo.DeleteSpecific(number, platform, country)
 }
 
+func (s *Service) UpdateLastUsed(number, platform, country string) error {
+	return s.repo.UpdateLastUsed(number, platform, country)
+}
+
 func (s *Service) BulkInsert(platform, country string, numbers []string) (int, error) {
 	return s.repo.BulkInsert(platform, country, numbers)
 }

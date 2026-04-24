@@ -50,7 +50,7 @@ func (r *NumberRepo) GetNumbers(platform, country, userID string, excludeNums []
 		WHERE platform = $1 AND country = $2
 		AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 		AND number NOT IN (SELECT number FROM seen_numbers WHERE user_id = $3)
-		ORDER BY RANDOM() LIMIT $4`
+		ORDER BY last_used_at ASC, id ASC LIMIT $4`
 	var numbers []string
 	err := r.db.Select(&numbers, q1, platform, country, userID, limit)
 	if err != nil {
@@ -72,13 +72,13 @@ func (r *NumberRepo) GetNumbers(platform, country, userID string, excludeNums []
 			WHERE platform = $1 AND country = $2
 			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
 			AND number NOT IN (%s)
-			ORDER BY RANDOM() LIMIT $%d`, strings.Join(placeholders, ","), len(args))
+			ORDER BY last_used_at ASC, id ASC LIMIT $%d`, strings.Join(placeholders, ","), len(args))
 		err = r.db.Select(&numbers, q2, args...)
 	} else {
 		err = r.db.Select(&numbers, `SELECT number FROM platform_numbers pn
 			WHERE platform = $1 AND country = $2
 			AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
-			ORDER BY RANDOM() LIMIT $3`, platform, country, limit)
+			ORDER BY last_used_at ASC, id ASC LIMIT $3`, platform, country, limit)
 	}
 	return numbers, err
 }
@@ -88,7 +88,7 @@ func (r *NumberRepo) GetNextNumber(platform, country, excludeNum string) (string
 	err := r.db.Get(&n, `SELECT number FROM platform_numbers pn
 		WHERE platform = $1 AND country = $2 AND number != $3
 		AND NOT EXISTS (SELECT 1 FROM active_numbers an WHERE an.number = pn.number AND an.platform = pn.platform)
-		ORDER BY RANDOM() LIMIT 1`, platform, country, excludeNum)
+		ORDER BY last_used_at ASC, id ASC LIMIT 1`, platform, country, excludeNum)
 	return n, err
 }
 
@@ -99,6 +99,11 @@ func (r *NumberRepo) DeleteByPlatformCountry(platform, country string) error {
 
 func (r *NumberRepo) DeleteSpecific(num, platform, country string) error {
 	_, err := r.db.Exec("DELETE FROM platform_numbers WHERE number = $1 AND platform = $2 AND country = $3", num, platform, country)
+	return err
+}
+
+func (r *NumberRepo) UpdateLastUsed(num, platform, country string) error {
+	_, err := r.db.Exec("UPDATE platform_numbers SET last_used_at = CURRENT_TIMESTAMP WHERE number = $1 AND platform = $2 AND country = $3", num, platform, country)
 	return err
 }
 

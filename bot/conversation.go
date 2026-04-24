@@ -18,12 +18,15 @@ const (
 	convStepAwaitFile      = 6
 	convStepRemovePlat     = 7
 	convStepRemoveCountry  = 8
+	convStepAwaitPlatform  = 9
 )
 
 type convContext struct {
-	Step     int
-	Platform string
-	Country  string
+	Step      int
+	Platform  string
+	Country   string
+	Platforms []string // Selected platforms for upload
+	Lines     []string // Numbers from file
 }
 
 var convMu sync.Mutex
@@ -60,7 +63,7 @@ func (b *Bot) handleConversationText(msg *tgbotapi.Message) bool {
 			b.setConvState(msg.From.ID, &convContext{Step: convStepNewPlatName})
 			b.removeKeyboard(msg.Chat.ID, "<b>Enter the new platform name (e.g., WhatsApp):</b>")
 		} else {
-			plat := msg.Text
+			plat := strings.ToLower(msg.Text)
 			ctx.Platform = plat
 			ctx.Step = convStepChooseCountry
 			b.setConvState(msg.From.ID, ctx)
@@ -86,7 +89,7 @@ func (b *Bot) handleConversationText(msg *tgbotapi.Message) bool {
 			ctx.Country = msg.Text
 			ctx.Step = convStepAwaitFile
 			b.setConvState(msg.From.ID, ctx)
-			b.removeKeyboard(msg.Chat.ID, fmt.Sprintf("<b>Selected: %s - %s</b>\nUpload .txt file:", ctx.Platform, ctx.Country))
+			b.removeKeyboard(msg.Chat.ID, fmt.Sprintf("<b>Selected: %s - %s</b>\nUpload .txt file:", capitalize(ctx.Platform), ctx.Country))
 		}
 		return true
 
@@ -125,40 +128,223 @@ func (b *Bot) handleConversationText(msg *tgbotapi.Message) bool {
 
 // handleConversationDocument handles file uploads during conversation
 func (b *Bot) handleConversationDocument(msg *tgbotapi.Message) bool {
-	ctx := b.getConvState(msg.From.ID)
-	if ctx == nil || ctx.Step != convStepAwaitFile {
+	userID := msg.From.ID
+	ctx := b.getConvState(userID)
+
+	isAdmin, _ := b.adminSvc.IsAdmin(fmt.Sprintf("%d", userID))
+	if !isAdmin {
 		return false
 	}
 
-	plat := ctx.Platform
-	coun := ctx.Country
+	// Case 1: Manual flow (deprecated but kept for compatibility if needed)
+	if ctx != nil && ctx.Step == convStepAwaitFile {
+		plat := ctx.Platform
+		coun := ctx.Country
 
-	file, err := b.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
-	if err != nil {
-		b.sendHTML(msg.Chat.ID, "<b>Error getting file.</b>")
+		file, err := b.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
+		if err != nil {
+			b.sendHTML(msg.Chat.ID, "<b>Error getting file.</b>")
+			return true
+		}
+
+		content, err := downloadFile(b.api, file)
+		if err != nil {
+			b.sendHTML(msg.Chat.ID, "<b>Error downloading file.</b>")
+			return true
+		}
+
+		lines := strings.Split(string(content), "\n")
+		count, _ := b.numberSvc.BulkInsert(plat, coun, lines)
+		b.setConvState(msg.From.ID, nil)
+
+		b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>Successfully added %d numbers to %s (%s).</b>", count, plat, coun))
+
+		// Broadcast new numbers notification
+		broadcastMsg := fmt.Sprintf(
+			"<b>🚀 New Numbers Added!</b>\n\n<b>Platform:</b> <code>%s</code>\n<b>Country:</b> <code>%s</code>\n<b>Quantity:</b> <code>%d</code> <b>numbers</b>\n\n<i>Get your number now using the button below!</i>",
+			plat, coun, count)
+		userIDs, _ := b.userSvc.GetUnblockedUserIDs()
+		go b.runBroadcast(userIDs, broadcastMsg, msg.Chat.ID)
+
 		return true
 	}
 
-	content, err := downloadFile(b.api, file)
-	if err != nil {
-		b.sendHTML(msg.Chat.ID, "<b>Error downloading file.</b>")
+	// Case 2: New direct upload flow with auto-country detection
+	if strings.HasSuffix(strings.ToLower(msg.Document.FileName), ".txt") {
+		// Detect country from filename: CountryName_Numbers.txt
+		parts := strings.Split(msg.Document.FileName, "_")
+		if len(parts) < 2 {
+			// If it doesn't match the pattern, don't auto-handle unless in a state
+			if ctx == nil {
+				return false
+			}
+		}
+
+		country := parts[0]
+		file, err := b.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
+		if err != nil {
+			b.sendHTML(msg.Chat.ID, "<b>Error getting file.</b>")
+			return true
+		}
+
+		content, err := downloadFile(b.api, file)
+		if err != nil {
+			b.sendHTML(msg.Chat.ID, "<b>Error downloading file.</b>")
+			return true
+		}
+
+		lines := strings.Split(string(content), "\n")
+		var cleanLines []string
+		for _, l := range lines {
+			l = strings.TrimSpace(l)
+			if l != "" {
+				cleanLines = append(cleanLines, l)
+			}
+		}
+
+		if len(cleanLines) == 0 {
+			b.sendHTML(msg.Chat.ID, "<b>The uploaded file is empty.</b>")
+			return true
+		}
+
+		// Set state to await platform selection
+		b.setConvState(userID, &convContext{
+			Step:     convStepAwaitPlatform,
+			Country:  country,
+			Lines:    cleanLines,
+			Platforms: []string{},
+		})
+
+		b.showUploadPlatformSelector(msg.Chat.ID, country, []string{})
 		return true
 	}
 
-	lines := strings.Split(string(content), "\n")
-	count, _ := b.numberSvc.BulkInsert(plat, coun, lines)
-	b.setConvState(msg.From.ID, nil)
+	return false
+}
 
-	b.sendHTML(msg.Chat.ID, fmt.Sprintf("<b>Successfully added %d numbers to %s (%s).</b>", count, plat, coun))
+func (b *Bot) showUploadPlatformSelector(chatID int64, country string, selected []string) {
+	platforms := []string{"facebook", "instagram", "whatsapp", "imo", "telegram"}
+	var rows [][]tgbotapi.InlineKeyboardButton
 
-	// Broadcast new numbers notification
+	for _, p := range platforms {
+		isSelected := false
+		for _, s := range selected {
+			if s == p {
+				isSelected = true
+				break
+			}
+		}
+
+		label := p
+		if isSelected {
+			label = "✅ " + p
+		}
+
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, "toggle_upload_plat::"+p),
+		))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("✅ Done", "confirm_upload"),
+	))
+
+	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	text := fmt.Sprintf("<b>Upload Numbers</b>\n\n<b>Country:</b> <code>%s</code>\nSelect platforms for these numbers:", country)
+
+	// Check if message already exists to edit or send new
+	// In conversation, we usually send new. But for toggling we'll edit.
+	// For the initial show, we send.
+	b.sendHTMLWithMarkup(chatID, text, markup)
+}
+
+func (b *Bot) handleUploadPlatToggle(cb *tgbotapi.CallbackQuery, plat string) {
+	ctx := b.getConvState(cb.From.ID)
+	if ctx == nil || ctx.Step != convStepAwaitPlatform {
+		return
+	}
+
+	found := false
+	for i, p := range ctx.Platforms {
+		if p == plat {
+			ctx.Platforms = append(ctx.Platforms[:i], ctx.Platforms[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		ctx.Platforms = append(ctx.Platforms, plat)
+	}
+
+	b.setConvState(cb.From.ID, ctx)
+
+	// Update the keyboard
+	platforms := []string{"facebook", "instagram", "whatsapp", "imo", "telegram"}
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	for _, p := range platforms {
+		isSelected := false
+		for _, s := range ctx.Platforms {
+			if s == p {
+				isSelected = true
+				break
+			}
+		}
+
+		label := p
+		if isSelected {
+			label = "✅ " + p
+		}
+
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, "toggle_upload_plat::"+p),
+		))
+	}
+
+	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("✅ Done", "confirm_upload"),
+	))
+
+	markup := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	text := fmt.Sprintf("<b>Upload Numbers</b>\n\n<b>Country:</b> <code>%s</code>\nSelect platforms for these numbers:", ctx.Country)
+
+	b.safeEdit(cb.Message.Chat.ID, cb.Message.MessageID, text, &markup)
+}
+
+func (b *Bot) handleUploadConfirm(cb *tgbotapi.CallbackQuery) {
+	userID := cb.From.ID
+	ctx := b.getConvState(userID)
+	if ctx == nil || ctx.Step != convStepAwaitPlatform {
+		return
+	}
+
+	if len(ctx.Platforms) == 0 {
+		b.answerCallback(cb.ID, "❌ Please select at least one platform.", true)
+		return
+	}
+
+	totalInserted := 0
+	platformsStr := strings.Join(ctx.Platforms, ", ")
+
+	for _, plat := range ctx.Platforms {
+		count, _ := b.numberSvc.BulkInsert(plat, ctx.Country, ctx.Lines)
+		totalInserted += count
+	}
+
+	b.setConvState(userID, nil)
+
+	// Notify admin
+	b.safeEdit(cb.Message.Chat.ID, cb.Message.MessageID,
+		fmt.Sprintf("<b>✅ Upload Successful!</b>\n\n<b>Country:</b> <code>%s</code>\n<b>Platforms:</b> <code>%s</code>\n<b>Total Numbers Added:</b> <code>%d</code>",
+			ctx.Country, platformsStr, totalInserted),
+		nil)
+
+	// Broadcast
 	broadcastMsg := fmt.Sprintf(
 		"<b>🚀 New Numbers Added!</b>\n\n<b>Platform:</b> <code>%s</code>\n<b>Country:</b> <code>%s</code>\n<b>Quantity:</b> <code>%d</code> <b>numbers</b>\n\n<i>Get your number now using the button below!</i>",
-		plat, coun, count)
+		platformsStr, ctx.Country, totalInserted)
 	userIDs, _ := b.userSvc.GetUnblockedUserIDs()
-	go b.runBroadcast(userIDs, broadcastMsg, msg.Chat.ID)
-
-	return true
+	go b.runBroadcast(userIDs, broadcastMsg, cb.Message.Chat.ID)
 }
 
 // handleAddNumber starts add number conversation
@@ -170,7 +356,7 @@ func (b *Bot) handleAddNumber(msg *tgbotapi.Message) {
 	platforms, _ := b.numberSvc.GetPlatforms()
 	var rows [][]tgbotapi.KeyboardButton
 	for _, p := range platforms {
-		rows = append(rows, tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(p)))
+		rows = append(rows, tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(capitalize(p))))
 	}
 	rows = append(rows, tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("➕ New Platform")))
 	kb := tgbotapi.NewReplyKeyboard(rows...)
@@ -227,7 +413,7 @@ func (b *Bot) showCountryKeyboard(chatID int64, platform string) {
 	kb := tgbotapi.NewReplyKeyboard(rows...)
 	kb.OneTimeKeyboard = true
 	kb.ResizeKeyboard = true
-	m := tgbotapi.NewMessage(chatID, fmt.Sprintf("<b>Platform: %s</b>\nSelect a country or add new:", platform))
+	m := tgbotapi.NewMessage(chatID, fmt.Sprintf("<b>Platform: %s</b>\nSelect a country or add new:", capitalize(platform)))
 	m.ParseMode = tgbotapi.ModeHTML
 	m.ReplyMarkup = kb
 	b.api.Send(m)
