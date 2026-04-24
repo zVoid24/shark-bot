@@ -257,12 +257,13 @@ func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
 		errorCount   int
 		mu           sync.Mutex
 		wg           sync.WaitGroup
+		backoffUntil time.Time
 	)
 
 	userChan := make(chan string, 100)
 	workerCount := 30
-	// Telegram allows 30 messages per second. We use ~29/sec to be safe.
-	ticker := time.NewTicker(34 * time.Millisecond)
+	// Telegram allows 30 messages per second. We use ~20/sec to be safe and leave headroom.
+	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 
 	// Start worker pool
@@ -271,9 +272,6 @@ func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
 		go func() {
 			defer wg.Done()
 			for uid := range userChan {
-				// Throttle based on ticker
-				<-ticker.C
-
 				chatID, err := strconv.ParseInt(uid, 10, 64)
 				if err != nil || chatID == 0 {
 					continue
@@ -282,32 +280,62 @@ func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
 				m := tgbotapi.NewMessage(chatID, text)
 				m.ParseMode = tgbotapi.ModeHTML
 
-				_, err = b.api.Send(m)
-				mu.Lock()
-				if err != nil {
-					// Check if user blocked the bot
+				// Retry loop for rate limits
+				for {
+					mu.Lock()
+					wait := time.Until(backoffUntil)
+					mu.Unlock()
+					if wait > 0 {
+						time.Sleep(wait)
+					}
+
+					// Throttle based on ticker
+					<-ticker.C
+
+					_, err = b.api.Send(m)
+					if err == nil {
+						mu.Lock()
+						successCount++
+						mu.Unlock()
+						break // success
+					}
+
+					mu.Lock()
 					errStr := strings.ToLower(err.Error())
+
+					// 1. Check if user blocked the bot
 					if strings.Contains(errStr, "forbidden") || strings.Contains(errStr, "blocked") || strings.Contains(errStr, "deactivated") {
 						blockedCount++
-						// Persist the block status in our DB to skip them in future broadcasts
 						_ = b.userSvc.BlockUser(uid)
-					} else {
-						errorCount++
-						log.Error("broadcast send failed", "user_id", uid, "err", err)
-
-						// If it's a network error, back off briefly to let things stabilize
-						errStr := strings.ToLower(err.Error())
-						if strings.Contains(errStr, "connection reset") ||
-							strings.Contains(errStr, "timeout") ||
-							strings.Contains(errStr, "eof") {
-							log.Warn("network issue detected; pausing worker for 1s", "err", err)
-							time.Sleep(1 * time.Second)
-						}
+						mu.Unlock()
+						break
 					}
-				} else {
-					successCount++
+
+					// 2. Handle Rate Limits (429)
+					if e, ok := err.(*tgbotapi.Error); ok && e.Code == 429 {
+						retryAfter := e.ResponseParameters.RetryAfter
+						if retryAfter == 0 {
+							retryAfter = 5
+						}
+						log.Warn("broadcast rate limited; backing off", "retry_after", retryAfter, "user_id", uid)
+						backoffUntil = time.Now().Add(time.Duration(retryAfter) * time.Second)
+						mu.Unlock()
+						continue // retry this user after sleep
+					}
+
+					// 3. Handle Network/Other Errors
+					errorCount++
+					log.Error("broadcast send failed", "user_id", uid, "err", err)
+
+					if strings.Contains(errStr, "connection reset") ||
+						strings.Contains(errStr, "timeout") ||
+						strings.Contains(errStr, "eof") {
+						log.Warn("network issue detected; pausing worker for 1s", "err", err)
+						time.Sleep(1 * time.Second)
+					}
+					mu.Unlock()
+					break // move on to next user
 				}
-				mu.Unlock()
 			}
 		}()
 	}

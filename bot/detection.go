@@ -276,7 +276,7 @@ func GetFlagEmojiIDByName(name string) string {
 	return ""
 }
 
-func DetectCountry(number string) (string, string) {
+func DetectCountry(number string) (string, string, string) {
 	n := strings.ReplaceAll(number, "+", "")
 	n = strings.ReplaceAll(n, " ", "")
 	n = strings.ReplaceAll(n, "-", "")
@@ -292,10 +292,10 @@ func DetectCountry(number string) (string, string) {
 	for _, k := range keys {
 		if strings.HasPrefix(n, k) {
 			info := CountryMap[k]
-			return info.Code, info.Flag
+			return info.Code, info.Name, info.Flag
 		}
 	}
-	return "UN", "🌍"
+	return "UN", "Unknown", "🌍"
 }
 
 func GetServiceAnimation(service string) string {

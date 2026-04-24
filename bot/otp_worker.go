@@ -108,7 +108,7 @@ func (b *Bot) processResults(results []SMSResult) {
 func (b *Bot) processScrapedSMS(res SMSResult) {
 	// 1. Extract details using ported logic
 	otp := ExtractOTPCode(res.Message)
-	shortCode, flag := DetectCountry(res.Number)
+	shortCode, _, flag := DetectCountry(res.Number)
 	masked := MaskPhoneNumber(res.Number)
 	service := DetectServiceFromMessage(res.Message)
 	if service == "UNKNOWN" && res.Service != "" && res.Service != "0" {

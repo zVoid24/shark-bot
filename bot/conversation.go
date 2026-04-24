@@ -171,16 +171,6 @@ func (b *Bot) handleConversationDocument(msg *tgbotapi.Message) bool {
 
 	// Case 2: New direct upload flow with auto-country detection
 	if strings.HasSuffix(strings.ToLower(msg.Document.FileName), ".txt") {
-		// Detect country from filename: CountryName_Numbers.txt
-		parts := strings.Split(msg.Document.FileName, "_")
-		if len(parts) < 2 {
-			// If it doesn't match the pattern, don't auto-handle unless in a state
-			if ctx == nil {
-				return false
-			}
-		}
-
-		country := parts[0]
 		file, err := b.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
 		if err != nil {
 			b.sendHTML(msg.Chat.ID, "<b>Error getting file.</b>")
@@ -207,15 +197,25 @@ func (b *Bot) handleConversationDocument(msg *tgbotapi.Message) bool {
 			return true
 		}
 
+		// Auto-detect country from the first number in the file
+		_, country, flag := DetectCountry(cleanLines[0])
+		if country == "Unknown" {
+			b.sendHTML(msg.Chat.ID, "<b>Could not detect country from the first number in the file. Please ensure it starts with a country code (e.g., +880 or 880).</b>")
+			return true
+		}
+
+		// Prepend flag to country name if available for consistent display
+		displayCountry := flag + " " + country
+
 		// Set state to await platform selection
 		b.setConvState(userID, &convContext{
-			Step:     convStepAwaitPlatform,
-			Country:  country,
-			Lines:    cleanLines,
+			Step:      convStepAwaitPlatform,
+			Country:   displayCountry,
+			Lines:     cleanLines,
 			Platforms: []string{},
 		})
 
-		b.showUploadPlatformSelector(msg.Chat.ID, country, []string{})
+		b.showUploadPlatformSelector(msg.Chat.ID, displayCountry, []string{})
 		return true
 	}
 
