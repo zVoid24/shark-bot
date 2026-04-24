@@ -241,8 +241,15 @@ func GetPlatformEmojiID(name string) string {
 
 func GetFlagByName(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
+	// Strip HTML if present
+	if strings.Contains(name, ">") {
+		parts := strings.Split(name, ">")
+		name = strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
+	}
+
 	for _, info := range CountryMap {
-		if strings.ToLower(info.Name) == name {
+		target := strings.ToLower(info.Name)
+		if target == name || strings.HasSuffix(name, " "+target) || strings.HasSuffix(name, "	"+target) {
 			return info.Flag
 		}
 	}

@@ -110,11 +110,23 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform, userID string) 
 	var rows [][]CustomButton
 
 	for _, c := range countries {
-		label := c
-		emojiID := GetFlagEmojiIDByName(c)
+		// Clean the country name from any HTML tags for labels and lookups
+		cleanName := stripHTML(c)
+		
+		// Extract only the text part for the label to avoid duplicate flags
+		displayLabel := cleanName
+		for i, r := range cleanName {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				displayLabel = cleanName[i:]
+				break
+			}
+		}
+		
+		label := displayLabel
+		emojiID := GetFlagEmojiIDByName(cleanName)
 
 		if emojiID == "" {
-			label = GetFlagEmojiByName(c) + " " + c
+			label = GetFlagEmojiByName(cleanName) + " " + cleanName
 		}
 
 		if isAdmin {
@@ -127,7 +139,7 @@ func (b *Bot) showCountryList(chatID int64, msgID int, platform, userID string) 
 		rows = append(rows, []CustomButton{
 			{
 				Text:          label,
-				CallbackData:  fmt.Sprintf("select_country::%s::%s", platform, c),
+				CallbackData:  fmt.Sprintf("select_country::%s::%s", platform, stripHTML(c)),
 				CustomEmojiID: emojiID,
 			},
 		})
@@ -201,6 +213,15 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		}
 	}
 
+	// Find the real country name in case 'country' was stripped of HTML for callback data
+	allCountries, _ := b.numberSvc.GetCountries(platform)
+	for _, c := range allCountries {
+		if stripHTML(c) == country {
+			country = c
+			break
+		}
+	}
+
 	// Fetch up to 3 numbers
 	numbers, err := b.numberSvc.GetNumbers(platform, country, userIDStr, excludeNums, 3)
 	if err != nil || len(numbers) == 0 {
@@ -231,7 +252,7 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 		_ = b.seenSvc.Add(userIDStr, num, country)
 
 		// Add number to text (monospaced)
-		numbersText += fmt.Sprintf("📱 <b>#%d:</b> <code>%s</code>\n", i+1, num)
+		numbersText += fmt.Sprintf("<tg-emoji emoji-id='5406809207947142040'>📱</tg-emoji> <b>#%d:</b> <code>%s</code>\n", i+1, num)
 
 		// Add to copy row
 		copyRow = append(copyRow, CustomButton{
@@ -248,32 +269,33 @@ func (b *Bot) assignNumbers(chatID int64, userID int64, platform, country string
 
 	_ = b.activeSvc.UpdateMessageID(userIDStr, int64(msgID))
 
+	cleanCountry := stripHTML(country)
 	text := fmt.Sprintf(
 		"<b>%s %s - %s %s</b>\n"+
 			"────────────────────────\n"+
 			"%s\n"+
 			"<i>⏳ Waiting for OTP... (Auto-expiry: 1h)</i>",
-		GetPlatformEmoji(platform), capitalize(platform), GetFlagByName(country), country, numbersText,
+		GetPlatformEmoji(platform), capitalize(platform), GetFlagByName(cleanCountry), cleanCountry, numbersText,
 	)
 
 	// Add navigation buttons
 	rows = append(rows, []CustomButton{
 		{
 			Text:          "Change (10s CD)",
-			CallbackData:  fmt.Sprintf("change_number::%s::%s", platform, country),
+			CallbackData:  fmt.Sprintf("change_number::%s::%s", platform, stripHTML(country)),
 			CustomEmojiID: "5231197925178089666",
 		},
 		{
 			Text:          "Back",
 			CallbackData:  fmt.Sprintf("back_to_countries::%s", platform),
-			CustomEmojiID: "5471949924658588235", // Telegram-style arrow
+			CustomEmojiID: "6206505206197261313", // Telegram-style arrow
 		},
 	})
 	rows = append(rows, []CustomButton{
 		{
 			Text:          "OTP Group",
 			URL:           "https://t.me/shark_sms_panel",
-			CustomEmojiID: "5330237710655306682", // Telegram logo
+			CustomEmojiID: "5443038326535759644", // Telegram logo
 		},
 		{
 			Text:          "Guide",

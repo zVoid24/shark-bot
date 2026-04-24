@@ -153,6 +153,26 @@ func (b *Bot) sendHTMLCustom(chatID int64, msgID int, text string, markup Custom
 	}
 }
 
+// stripHTML removes HTML tags from a string
+func stripHTML(s string) string {
+	inTag := false
+	var result strings.Builder
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
 // capitalize returns a string with the first letter in upper case
 func capitalize(s string) string {
 	if len(s) == 0 {

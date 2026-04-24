@@ -198,24 +198,25 @@ func (b *Bot) handleConversationDocument(msg *tgbotapi.Message) bool {
 		}
 
 		// Auto-detect country from the first number in the file
-		_, country, flag := DetectCountry(cleanLines[0])
+		_, country, _ := DetectCountry(cleanLines[0])
 		if country == "Unknown" {
 			b.sendHTML(msg.Chat.ID, "<b>Could not detect country from the first number in the file. Please ensure it starts with a country code (e.g., +880 or 880).</b>")
 			return true
 		}
 
-		// Prepend flag to country name if available for consistent display
-		displayCountry := flag + " " + country
+		// Use a clean flag (emoji character) for storage to keep CallbackData short (Telegram limit is 64 bytes)
+		cleanFlag := GetFlagEmojiByName(country)
+		storageCountry := cleanFlag + " " + country
 
 		// Set state to await platform selection
 		b.setConvState(userID, &convContext{
 			Step:      convStepAwaitPlatform,
-			Country:   displayCountry,
+			Country:   storageCountry,
 			Lines:     cleanLines,
 			Platforms: []string{},
 		})
 
-		b.showUploadPlatformSelector(msg.Chat.ID, displayCountry, []string{})
+		b.showUploadPlatformSelector(msg.Chat.ID, storageCountry, []string{})
 		return true
 	}
 
