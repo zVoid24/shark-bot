@@ -294,6 +294,15 @@ func (b *Bot) runBroadcast(userIDs []string, text string, adminChatID int64) {
 					} else {
 						errorCount++
 						log.Error("broadcast send failed", "user_id", uid, "err", err)
+
+						// If it's a network error, back off briefly to let things stabilize
+						errStr := strings.ToLower(err.Error())
+						if strings.Contains(errStr, "connection reset") ||
+							strings.Contains(errStr, "timeout") ||
+							strings.Contains(errStr, "eof") {
+							log.Warn("network issue detected; pausing worker for 1s", "err", err)
+							time.Sleep(1 * time.Second)
+						}
 					}
 				} else {
 					successCount++

@@ -125,7 +125,14 @@ func (b *Bot) sendHTMLCustom(chatID int64, msgID int, text string, markup Custom
 	params.Set("reply_markup", string(markupBytes))
 
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/%s", b.api.Token, method)
-	resp, err := http.PostForm(apiURL, params)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(params.Encode()))
+	if err != nil {
+		botLog.Error("failed to create request", "err", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := b.api.Client.Do(req)
 	if err != nil {
 		botLog.Error("direct API request failed", "method", method, "err", err)
 		return

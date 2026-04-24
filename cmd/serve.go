@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"net/http"
 	"shark_bot/infra/db"
 	"shark_bot/infra/repository"
 	"shark_bot/internal/activenumber"
@@ -108,8 +109,18 @@ func Serve() {
 		log.Warn("could not seed owners", "err", err)
 	}
 
-	// 7. Connect to Telegram
-	api, err := tgbotapi.NewBotAPI(cnf.Telegram.BotToken)
+	// 7. Connect to Telegram with a tuned HTTP client
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			MaxConnsPerHost:     100,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
+		Timeout: 60 * time.Second,
+	}
+	api, err := tgbotapi.NewBotAPIWithClient(cnf.Telegram.BotToken, tgbotapi.APIEndpoint, httpClient)
 	if err != nil {
 		log.Error("telegram bot init failed", "err", err)
 		panic(err)
