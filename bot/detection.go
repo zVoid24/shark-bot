@@ -96,6 +96,7 @@ var CountryMap = map[string]CountryInfo{
 	"855": {"KH", "<tg-emoji emoji-id='5224638530864556281'>🇰🇭</tg-emoji>", "Cambodia"},
 	"856": {"LA", "<tg-emoji emoji-id='5224638530864556281'>🇱🇦</tg-emoji>", "Laos"},
 	"960": {"MV", "<tg-emoji emoji-id='5224393700548814960'>🇲🇻</tg-emoji>", "Maldives"},
+	"7": {"RU", "<tg-emoji emoji-id='5222304379330471283'>🇷🇺</tg-emoji>", "Russia"},
 	"961": {"LB", "🇱🇧", "Lebanon"},
 	"962": {"JO", "<tg-emoji emoji-id='5222229234600130045'>🇯🇴</tg-emoji>", "Jordan"},
 	"963": {"SY", "<tg-emoji emoji-id='5224601903383457698'>🇸🇾</tg-emoji>", "Syria"},
